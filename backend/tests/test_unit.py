@@ -119,3 +119,13 @@ def test_chain_to_target():
             Hop("p", "Bố", "c2", "Con 2", "parent_of", "con trai", "u")]
     chain = SearchService._chain_to(hops, "c2")
     assert [h.to_id for h in chain] == ["p", "c2"]
+
+
+def test_inline_data_url_is_dropped(tmp_path):
+    src = tmp_path / "inline.csv"
+    src.write_text("entity_id,canonical_name,image_url,status\n"
+                   "e1,Mỹ Tâm,\"data:image/png;base64," + "A" * 9000 + "\",approved\n"
+                   "e1,Mỹ Tâm,https://x.test/a.jpg,approved\n", encoding="utf-8")
+    rows = [r for _, r in canonical_rows(src, load_profile())]
+    assert rows[0] == {"url_dropped": True}
+    assert rows[1]["image_url"] == "https://x.test/a.jpg" and not rows[1]["url_dropped"]

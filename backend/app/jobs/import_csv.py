@@ -17,6 +17,7 @@ from ..textnorm import fold, norm
 
 PROFILE_PATH = Path(__file__).resolve().parents[2] / "config" / "import_profiles.json"
 BATCH = 1000
+MAX_URL = 2048  # inline data: URIs and runaway URLs cannot be indexed or fetched; they are dropped and counted
 
 
 def load_profile() -> dict:
@@ -65,18 +66,23 @@ def canonical_rows(path: Path, profile: dict):
             record = {f: (raw.get(col) or "").strip() if col else "" for f, col in mapping.items()}
             status_raw = record["approval_status"].lower()
             record["approval_status"] = profile["status_map"].get(status_raw, "unknown")
+            url = record["image_url"]
+            record["url_dropped"] = bool(url) and (url.startswith("data:") or len(url) > MAX_URL)
+            if record["url_dropped"]:
+                record["image_url"] = ""
             if not record["entity_key"] or not record["canonical_name"]:
                 yield row_no, None
                 continue
             if not record["image_url"] and not record["local_path"]:
-                yield row_no, None
+                yield row_no, {"url_dropped": True} if record["url_dropped"] else None
                 continue
             yield row_no, record
 
 
 def import_file(conn, path: Path, profile: dict) -> dict:
     namespace = profile["entity_namespace"]
-    stats = {"file": path.name, "rows": 0, "bad_rows": 0, "approved": 0, "rejected": 0, "unknown": 0}
+    stats = {"file": path.name, "rows": 0, "bad_rows": 0, "url_dropped": 0,
+             "approved": 0, "rejected": 0, "unknown": 0}
     entities: dict[uuid.UUID, tuple] = {}
     links: list[tuple] = []
 
@@ -111,9 +117,11 @@ def import_file(conn, path: Path, profile: dict) -> dict:
 
     for row_no, rec in canonical_rows(path, profile):
         stats["rows"] += 1
-        if rec is None:
+        if rec is None or "entity_key" not in rec:
             stats["bad_rows"] += 1
+            stats["url_dropped"] += rec is not None
             continue
+        stats["url_dropped"] += rec["url_dropped"]
         stats[rec["approval_status"]] += 1
         eid = entity_uuid(rec["entity_key"], namespace)
         kind = (rec.get("kind_hint") or "").lower()
