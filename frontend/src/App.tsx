@@ -20,6 +20,7 @@ const STATUS_TEXT: Record<string, string> = {
   no_seed_entity: "Không nhận ra tên người hoặc tổ chức trong câu hỏi.",
   needs_clarification: "Tên này khớp với nhiều người, hãy chọn một.",
 };
+const REFINE_TEXT = "Tên này khớp với nhiều người, đang hiện ảnh của tất cả. Chỉ xem một người:";
 
 export default function App() {
   const [query, setQuery] = useState("");
@@ -156,9 +157,9 @@ function Results({
         ))}
       </div>
 
-      {result.status === "needs_clarification" && (
-        <div className="notice">
-          <p>{STATUS_TEXT.needs_clarification}</p>
+      {result.clarification_options.length > 0 && (
+        <div className={result.status === "needs_clarification" ? "notice" : "refine"}>
+          <p>{result.status === "needs_clarification" ? STATUS_TEXT.needs_clarification : REFINE_TEXT}</p>
           {result.clarification_options.map((o) => (
             <div key={o.mention} className="example-row">
               <span className="muted">“{o.mention}”</span>

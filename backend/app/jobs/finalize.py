@@ -8,6 +8,8 @@ import hashlib
 import json
 import time
 
+import psycopg
+
 from ..config import get_settings
 from ..db import connect, migrate, set_meta
 from ..textnorm import fold
@@ -61,9 +63,18 @@ def build_vector_index(conn, dim: int) -> None:
     conn.execute("DROP INDEX IF EXISTS images_embedding_hnsw")
     conn.execute(f"ALTER TABLE images ALTER COLUMN embedding TYPE vector({int(dim)})")
     conn.execute("SET maintenance_work_mem = '1GB'")
-    conn.execute("""CREATE INDEX images_embedding_hnsw ON images
-                    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128)
-                    WHERE is_serving""")
+    create = """CREATE INDEX images_embedding_hnsw ON images
+                USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128)
+                WHERE is_serving"""
+    try:
+        conn.execute(create)
+    except psycopg.errors.DiskFull:
+        # A parallel build shares maintenance_work_mem through /dev/shm, which Docker caps at 64 MB
+        # unless the db service sets shm_size. Fall back to a single-process build, which uses plain memory.
+        print("  /dev/shm too small for a parallel index build; building with one process")
+        conn.execute("DROP INDEX IF EXISTS images_embedding_hnsw")
+        conn.execute("SET max_parallel_maintenance_workers = 0")
+        conn.execute(create)
 
 
 def main(argv=None) -> int:

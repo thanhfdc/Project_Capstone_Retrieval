@@ -8,7 +8,7 @@ import json
 import numpy as np
 
 from ..config import get_settings
-from ..services.encoder import TEXT_MAX_LEN, SiglipEncoder
+from ..services.encoder import TEXT_INPUTS, TEXT_MAX_LEN, SiglipEncoder
 
 PROBES = ["bãi biển Nha Trang", "ca sĩ đang biểu diễn trên sân khấu", "hồ bơi", "a dog"]
 
@@ -37,7 +37,7 @@ def main(argv=None) -> int:
     batch = enc.processor(text=[p.lower() for p in PROBES], padding="max_length", truncation=True,
                           max_length=TEXT_MAX_LEN, return_tensors="pt")
     # Export exactly the inputs the processor produces (SigLIP 2 may or may not use a mask).
-    inputs = [k for k in ("input_ids", "attention_mask") if k in batch]
+    inputs = [k for k in TEXT_INPUTS if k in batch]
     torch.onnx.export(TextTower(enc.model).eval(), tuple(batch[k] for k in inputs), str(target),
                       input_names=inputs, output_names=["text_embeds"],
                       dynamic_axes={**{k: {0: "batch"} for k in inputs}, "text_embeds": {0: "batch"}},

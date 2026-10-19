@@ -75,17 +75,25 @@ class AliasIndex:
                 idx.by_alias[key] = refs
         return idx
 
+    def _longest_at(self, tokens: list[str], i: int) -> int:
+        for n in range(min(self.max_len, len(tokens) - i), 0, -1):
+            if " ".join(tokens[i:i + n]) in self.by_alias:
+                return n
+        return 0
+
     def find_spans(self, folded_tokens: list[str]) -> list[Span]:
-        spans, i = [], 0
-        while i < len(folded_tokens):
-            for n in range(min(self.max_len, len(folded_tokens) - i), 0, -1):
-                key = " ".join(folded_tokens[i:i + n])
-                if key in self.by_alias:
-                    spans.append(Span(i, i + n, key, list(self.by_alias[key])))
-                    i += n
-                    break
-            else:
+        """Longest match first, but a match is dropped when a match starting inside it reaches further:
+        in "anh tran minh dung" the name "Trần Minh Dũng" wins over "Anh Trần..." eating the word "ảnh"."""
+        spans, i, L = [], 0, len(folded_tokens)
+        reach = [j + self._longest_at(folded_tokens, j) for j in range(L)]
+        while i < L:
+            n = reach[i] - i
+            if n == 0 or any(reach[j] > reach[i] for j in range(i + 1, reach[i])):
                 i += 1
+                continue
+            key = " ".join(folded_tokens[i:i + n])
+            spans.append(Span(i, i + n, key, list(self.by_alias[key])))
+            i += n
         return spans
 
 

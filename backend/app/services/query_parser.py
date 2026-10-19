@@ -49,6 +49,7 @@ RELATION_PHRASES: dict[str, RelationStep] = {
 _REL_KEYS = sorted(RELATION_PHRASES, key=lambda k: -len(k.split()))
 # "của" between a relation phrase and its argument is noise.
 FILLER = {"cua", "la", "ong", "ba", "anh", "chi", "cac", "nhung", "nguoi"}
+PHOTO_WORDS = {"ảnh", "hình", "tấm", "bức", "tìm"}
 LEADING_NOISE = [("hinh", "anh"), ("buc", "anh"), ("tam", "anh"), ("anh",), ("hinh",), ("cho", "toi"),
                  ("tim",), ("tim", "kiem"), ("nhung",), ("cac",)]
 # Titles written right before a name are apposition, not relations: "con trai chủ tịch Phạm Nhật Vượng".
@@ -112,9 +113,14 @@ class RuleParser:
         orig = norm(query).split()
         folded = fold(query).split()
         index: AliasIndex = self._index()
-        spans = index.find_spans(folded)
+        # "ảnh"/"hình" typed with diacritics at the start is the word "photo", never the name "Anh"
+        masked = list(folded)
+        for k, word in enumerate(orig[:2]):
+            if word in PHOTO_WORDS:
+                masked[k] = "#"
+        spans = index.find_spans(masked)
         if not spans and self._fuzzy:
-            spans = self._fuzzy(folded)
+            spans = self._fuzzy(masked)
         plan = QueryPlan(query=query, intents=[])
 
         # 1. Shared location suffix: "... ở/tại <place or free text>"

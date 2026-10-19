@@ -64,10 +64,10 @@ class SearchService:
             timer.lap("llm_ms")
 
         selected = set(selected_entity_ids or [])
-        clarifications = self._resolve_ambiguity(plan, selected)
-        if clarifications:
+        blocking, refine = self._resolve_ambiguity(plan, selected)
+        if blocking:
             return self._finish(key, started, timer, usage, plan, "needs_clarification", [], {}, [],
-                                clarifications, cache=False)
+                                blocking, cache=False)
 
         with self.pool.connection() as conn:
             groups, paths, warnings = self._run(conn, plan, top_k, timer)
@@ -78,7 +78,7 @@ class SearchService:
             g["image_ids"] = [i for i in g["image_ids"] if i in items]
         status = self._overall_status(groups)
         plan.warnings += warnings
-        return self._finish(key, started, timer, usage, plan, status, groups, items, paths, [])
+        return self._finish(key, started, timer, usage, plan, status, groups, items, paths, refine)
 
     def stats(self) -> dict:
         with self.pool.connection() as conn:
@@ -128,22 +128,32 @@ class SearchService:
                 ("multi_intent" if len(intents) > 1 else "single")
         return plan
 
-    def _resolve_ambiguity(self, plan: QueryPlan, selected: set[str]) -> list[dict]:
-        options = []
+    def _resolve_ambiguity(self, plan: QueryPlan, selected: set[str]) -> tuple[list[dict], list[dict]]:
+        """Return (blocking, refine) options. A name shared by several entities is searched as all
+        of them right away, with the candidates offered as optional refinements. Only "A chụp cùng B"
+        blocks, because "same photo as one of several people" has no sensible default."""
+        blocking, refine = [], []
         for it in plan.intents:
-            remaining = []
+            together = len(it.seeds) + len(it.ambiguous) > 1
+            unresolved = []
             for span in it.ambiguous:
                 chosen = [c for c in span.candidates if c.entity_id in selected]
+                option = {"mention": span.text, "candidates": [
+                    {"entity_id": c.entity_id, "name": c.name, "entity_type": c.entity_type}
+                    for c in span.candidates]}
                 if chosen:
                     it.seeds.extend(chosen)
+                elif together:
+                    unresolved.append(span)
+                    blocking.append(option)
                 else:
-                    remaining.append(span)
-            it.ambiguous = remaining
-            for span in remaining:
-                options.append({"mention": span.text, "candidates": [
-                    {"entity_id": c.entity_id, "name": c.name, "entity_type": c.entity_type}
-                    for c in span.candidates]})
-        return options
+                    it.seeds.extend(span.candidates)
+                    if len({fold(c.name) for c in span.candidates}) > 1:  # same name twice = one person
+                        refine.append(option)
+            it.ambiguous = unresolved
+            if together and not unresolved:
+                it.entity_operator = "all"
+        return blocking, refine
 
     # ---- execution ----------------------------------------------------------------------
     def _encode(self, texts: list[str]):

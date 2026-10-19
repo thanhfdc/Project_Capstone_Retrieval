@@ -9,6 +9,7 @@ x-db-env: &db-env
 services:
   db:
     image: pgvector/pgvector:0.8.0-pg16
+    shm_size: 1gb   # parallel HNSW builds share maintenance_work_mem via /dev/shm (Docker default is 64 MB)
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-capstone}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-capstone}

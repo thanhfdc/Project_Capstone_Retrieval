@@ -123,9 +123,17 @@ def test_location_scope_includes_sub_places(client):
     assert all("Phú Quốc" in n for n in names(r))
 
 
-def test_ambiguous_prefix_asks(client):
+def test_ambiguous_prefix_shows_all_and_offers_refinement(client):
     r = search(client, "ảnh Phạm Nhật")
+    assert r["status"] == "ok" and r["groups"][0]["image_ids"]
+    options = r["clarification_options"][0]["candidates"]
+    assert len(options) > 1
+    chosen = options[0]
+    r2 = search(client, "ảnh Phạm Nhật", selected_entity_ids=[chosen["entity_id"]])
+    assert r2["status"] in ("ok", "no_results") and not r2["clarification_options"]
+    assert [s["name"] for s in r2["interpretation"]["intents"][0]["seeds"]] == [chosen["name"]]
+
+
+def test_ambiguous_name_in_same_photo_query_asks(client):
+    r = search(client, "Sơn Tùng chụp cùng Phạm Nhật")
     assert r["status"] == "needs_clarification"
-    chosen = r["clarification_options"][0]["candidates"][0]["entity_id"]
-    r2 = search(client, "ảnh Phạm Nhật", selected_entity_ids=[chosen])
-    assert r2["status"] == "ok"

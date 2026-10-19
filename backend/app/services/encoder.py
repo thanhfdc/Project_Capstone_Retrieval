@@ -18,6 +18,7 @@ import numpy as np
 from ..textnorm import tokens
 
 TEXT_MAX_LEN = 64
+TEXT_INPUTS = ("input_ids", "attention_mask")  # some tokenizers also emit token_type_ids, which SigLIP rejects
 
 
 def _l2(x: np.ndarray) -> np.ndarray:
@@ -69,12 +70,14 @@ class SiglipEncoder:
         with self.torch.inference_mode():
             batch = self.processor(text=[t.lower() for t in texts], padding="max_length",
                                    truncation=True, max_length=TEXT_MAX_LEN, return_tensors="pt")
-            vectors = self.model.get_text_features(**batch)
+            vectors = self.model.get_text_features(**{k: batch[k] for k in TEXT_INPUTS if k in batch})
         return _l2(vectors.float().cpu().numpy())
 
     def encode_images(self, images: list) -> np.ndarray:
         with self.torch.inference_mode():
-            batch = self.processor(images=[im.convert("RGB") for im in images], return_tensors="pt")
+            # explicit layout: tiny or 1-pixel-wide images otherwise make the processor guess channels wrong
+            batch = self.processor.image_processor([im.convert("RGB") for im in images], return_tensors="pt",
+                                                   input_data_format="channels_last")
             vectors = self.model.get_image_features(**batch)
         return _l2(vectors.float().cpu().numpy())
 

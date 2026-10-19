@@ -56,6 +56,10 @@ def _index():
     add(5, "Vingroup", "organization")
     add(6, "Lê Anh")
     add(7, "Lê Anh", gender="female")
+    add(8, "Anh Trần Đăng Tuấn")       # names starting with "Anh"/"Ánh" used to swallow the word "ảnh"
+    add(9, "Trần Minh Dũng")
+    add(10, "Ánh Minh")
+    add(11, "Minh Tuyết")
     return AliasIndex.from_rows(rows)
 
 
@@ -108,6 +112,24 @@ def test_ambiguous_name_is_not_guessed(parser):
     assert not it.seeds and it.ambiguous and len(it.ambiguous[0].candidates) == 2
 
 
+@pytest.mark.parametrize("query,name", [
+    ("ảnh Trần Minh Dũng", "Trần Minh Dũng"),
+    ("ảnh Minh Tuyết", "Minh Tuyết"),
+    ("tìm ảnh Minh Tuyết", "Minh Tuyết"),
+    ("anh minh tuyet", "Minh Tuyết"),
+])
+def test_photo_word_is_not_part_of_a_name(parser, query, name):
+    plan = parser.parse(query)
+    assert plan.query_type == "single"
+    (it,) = plan.intents
+    assert [s.name for s in it.seeds] == [name] and not it.ambiguous
+
+
+def test_name_starting_with_anh_still_found(parser):
+    assert [s.name for s in parser.parse("ảnh Ánh Minh").intents[0].seeds] == ["Ánh Minh"]
+    assert [s.name for s in parser.parse("Anh Trần Đăng Tuấn").intents[0].seeds] == ["Anh Trần Đăng Tuấn"]
+
+
 def test_name_without_diacritics(parser):
     plan = parser.parse("pham nhat vuong")
     assert plan.intents[0].seeds[0].name == "Phạm Nhật Vượng"
@@ -129,3 +151,71 @@ def test_inline_data_url_is_dropped(tmp_path):
     rows = [r for _, r in canonical_rows(src, load_profile())]
     assert rows[0] == {"url_dropped": True}
     assert rows[1]["image_url"] == "https://x.test/a.jpg" and not rows[1]["url_dropped"]
+
+
+def test_duplicate_entity_with_same_name_is_one_person():
+    from app.services.entity_linker import EntityRef, Span
+    from app.services.query_parser import Intent, QueryPlan
+    from app.services.search import SearchService
+
+    dup = [EntityRef("a", "Phúc Du", "person", None), EntityRef("b", "Phúc Du", "person", None)]
+    plan = QueryPlan(query="Phúc Du", intents=[Intent(label="Phúc Du", ambiguous=[Span(0, 2, "phuc du", dup)])])
+    blocking, refine = SearchService._resolve_ambiguity(None, plan, set())
+    assert blocking == [] and refine == []
+    assert [s.entity_id for s in plan.intents[0].seeds] == ["a", "b"]
+
+
+def test_downloader_backs_off_on_403_then_recovers(monkeypatch):
+    import asyncio
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from types import SimpleNamespace
+
+    import httpx
+
+    from app.jobs import download as D
+
+    hits = {"n": 0}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits["n"] += 1
+            code = 403 if hits["n"] <= 2 else 200  # refuse twice, like a rate-limited CDN
+            self.send_response(code)
+            self.end_headers()
+            self.wfile.write(b"img")
+
+        def log_message(self, *a):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(D, "COOLDOWN_BASE", 0.05)
+    settings = SimpleNamespace(download_concurrency=4, download_per_host=2, download_host_rps=100.0,
+                               download_max_bytes=1000)
+
+    async def go():
+        dl = D.Downloader(settings, None)
+        async with httpx.AsyncClient() as client:
+            data = await dl.fetch_bytes(client, f"http://127.0.0.1:{server.server_port}/a.jpg")
+        return dl, data
+
+    try:
+        dl, data = asyncio.run(go())
+    finally:
+        server.shutdown()
+    assert data == b"img" and dl.stats["throttled"] == 2
+    assert dl.host_interval["127.0.0.1"] == 4 / 100.0  # rate halved twice
+
+
+def test_embed_isolates_an_image_the_encoder_rejects():
+    from app.jobs.embed import encode_safely
+
+    class Fussy:
+        def encode_images(self, images):
+            if any(im == "bad" for im in images):
+                raise ValueError("cannot handle this data type")
+            return [[1.0] for _ in images]
+
+    vectors, ids, bad = encode_safely(Fussy(), ["ok1", "bad", "ok2"], ["a", "b", "c"])
+    assert ids == ["a", "c"] and bad == 1 and len(vectors) == 2

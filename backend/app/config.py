@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     download_concurrency: int = 32
     download_per_host: int = 8
+    download_host_rps: float = 4.0     # starting request rate per host; halves when a host answers 403/429
     download_max_bytes: int = 20 * 1024 * 1024
     thumb_size: int = 480
 
