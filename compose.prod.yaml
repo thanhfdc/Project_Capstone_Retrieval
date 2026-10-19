@@ -1,0 +1,24 @@
+# Public deployment on a server with a domain name:
+#   DOMAIN=demo.example.com IMAGE_PREFIX=ghcr.io/<user>/<repo> \
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d
+# Caddy gets a Let's Encrypt certificate automatically; only ports 80/443 are public.
+services:
+  api:
+    image: ${IMAGE_PREFIX}-api:latest
+  web:
+    image: ${IMAGE_PREFIX}-web:latest
+    ports: !reset []
+  caddy:
+    image: caddy:2.8-alpine
+    command: caddy reverse-proxy --from ${DOMAIN} --to web:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+    depends_on:
+      web: { condition: service_healthy }
+    restart: unless-stopped
+
+volumes:
+  caddy_data:

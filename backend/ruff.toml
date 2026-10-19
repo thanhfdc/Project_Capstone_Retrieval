@@ -1,0 +1,7 @@
+line-length = 130
+target-version = "py312"
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["B008", "B905"]
+[lint.per-file-ignores]
+"../eval/*" = ["E501"]

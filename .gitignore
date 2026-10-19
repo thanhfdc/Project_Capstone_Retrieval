@@ -1,0 +1,14 @@
+data/*
+!data/raw/
+data/raw/*
+!data/raw/.gitkeep
+!data/relations/
+models/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+node_modules/
+frontend/dist/
+reports/*.json

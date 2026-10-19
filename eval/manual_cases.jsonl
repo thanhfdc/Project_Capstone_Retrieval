@@ -1,0 +1,6 @@
+{"query": "bãi biển Nha Trang", "query_type": "single", "expected_status": "ok"}
+{"query": "hồ bơi và công viên nước ở Phú Quốc", "query_type": "multi_intent", "expected_status": "ok"}
+{"query": "ảnh con trai chủ tịch Phạm Nhật Vượng", "query_type": "multi_hop", "expected_status": "ok"}
+{"query": "ca sĩ đang hát trên sân khấu", "query_type": "single", "expected_status": "ok"}
+{"query": "người mặc áo dài", "query_type": "single", "expected_status": "ok"}
+{"query": "con trai của người sáng lập Vingroup", "query_type": "multi_hop", "expected_status": "ok"}

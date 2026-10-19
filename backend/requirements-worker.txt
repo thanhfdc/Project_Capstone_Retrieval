@@ -1,0 +1,7 @@
+# Offline worker: image embeddings and ONNX export need torch (CPU wheel, see Dockerfile)
+-r requirements-api.txt
+torch==2.5.1
+onnx==1.17.0
+transformers==4.57.2
+sentencepiece==0.2.0
+protobuf==5.28.3

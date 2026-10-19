@@ -1,0 +1,21 @@
+{
+  "entity_namespace": "team_lead_capstone",
+  "columns": {
+    "entity_key": ["entity_id"],
+    "canonical_name": ["canonical_name", "name"],
+    "slug": ["slug"],
+    "category_raw": ["category"],
+    "kind_hint": ["kind_hint"],
+    "image_url": ["image_url"],
+    "local_path": ["local_path"],
+    "source_url": ["source_url"],
+    "description": ["description"],
+    "approval_status": ["status", "flag"],
+    "reject_reason": ["reject_reason"]
+  },
+  "required": ["entity_key", "canonical_name", "approval_status"],
+  "status_map": {
+    "approved": "approved",
+    "rejected": "rejected"
+  }
+}

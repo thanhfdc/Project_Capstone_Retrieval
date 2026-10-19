@@ -1,0 +1,71 @@
+# docker compose up -d --build            -> db + api + web on http://localhost:8080
+# docker compose --profile jobs run --rm worker python -m app.jobs.download_model
+# docker compose --profile jobs run --rm worker            -> full offline pipeline
+name: image-retrieval
+
+x-db-env: &db-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-capstone}:${POSTGRES_PASSWORD:-capstone}@db:5432/${POSTGRES_DB:-capstone}
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.0-pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-capstone}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-capstone}
+      POSTGRES_DB: ${POSTGRES_DB:-capstone}
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "effective_cache_size=2GB",
+              "-c", "maintenance_work_mem=1GB", "-c", "max_connections=50"]
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"   # only for eval scripts on the host
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build: { context: ./backend, target: api }
+    image: image-retrieval-api:latest
+    environment:
+      <<: *db-env
+      ENCODER_BACKEND: ${ENCODER_BACKEND:-onnx}
+      ENCODER_THREADS: ${ENCODER_THREADS:-4}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-claude-opus-5-5}
+    volumes:
+      - ./data:/data:ro
+      - ./models:/models:ro
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+
+  web:
+    build: { context: ./frontend }
+    image: image-retrieval-web:latest
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    volumes:
+      - ./data/media/thumbs:/media/thumbs:ro
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    profiles: ["jobs"]
+    build: { context: ./backend, target: worker }
+    image: image-retrieval-worker:latest
+    environment:
+      <<: *db-env
+      ENCODER_BACKEND: ${WORKER_ENCODER_BACKEND:-siglip}
+      ENCODER_THREADS: ${WORKER_THREADS:-8}
+    volumes:
+      - ./data:/data
+      - ./models:/models
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:

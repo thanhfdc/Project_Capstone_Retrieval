@@ -1,0 +1,12 @@
+# Runtime of the API image (no torch: text queries go through ONNX Runtime)
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+psycopg[binary,pool]==3.2.3
+pgvector==0.3.6
+pydantic-settings==2.6.1
+numpy==2.1.3
+pillow==11.0.0
+httpx==0.28.1
+onnxruntime==1.20.1
+tokenizers==0.22.1
+anthropic==1.12.0

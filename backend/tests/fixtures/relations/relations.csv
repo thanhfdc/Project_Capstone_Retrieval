@@ -1,0 +1,4 @@
+subject,predicate,object,source_url,evidence,verified
+Phạm Nhật Vượng,parent_of,Phạm Nhật Quân Anh,https://example.org/fixture,fixture only,true
+Phạm Nhật Vượng,founded,Vingroup,https://example.org/fixture,fixture only,true
+Bãi Dài,located_in,Phú Quốc,https://example.org/fixture,fixture only,true

@@ -1,0 +1,7 @@
+entity_id,slug,canonical_name,category,image_url,source_url,status,reject_reason
+6d9225fd-4a49-5e67-870e-6679e9f4274d,s,Phạm Nhật Quân Anh,businessman,http://127.0.0.1:8765/img026.jpg,https://example.org/b,approved,
+6d9225fd-4a49-5e67-870e-6679e9f4274d,s,Phạm Nhật Quân Anh,businessman,http://127.0.0.1:8765/img027.jpg,https://example.org/b,approved,
+6d9225fd-4a49-5e67-870e-6679e9f4274d,s,Phạm Nhật Quân Anh,businessman,http://127.0.0.1:8765/img028.jpg,https://example.org/b,rejected,
+db319a0e-2433-565c-9285-16b79ce900c9,s,Đen Vâu,singer,http://127.0.0.1:8765/img029.jpg,https://example.org/b,approved,
+db319a0e-2433-565c-9285-16b79ce900c9,s,Đen Vâu,singer,http://127.0.0.1:8765/img030.jpg,https://example.org/b,approved,
+db319a0e-2433-565c-9285-16b79ce900c9,s,Đen Vâu,singer,http://127.0.0.1:8765/img031.jpg,https://example.org/b,rejected,
