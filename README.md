@@ -10,7 +10,7 @@ Tìm ảnh trong kho khoảng 80K ảnh bằng ngôn ngữ tự nhiên, hỗ tr�
 
 Stack: FastAPI, PostgreSQL 16 + pgvector (HNSW) + full-text, SigLIP 2 (text tower chạy ONNX), React + Nginx, Docker Compose, GitHub Actions.
 
-Tài liệu: [kiến trúc và sơ đồ](docs/ARCHITECTURE.md) · [cách làm test case](docs/TESTING.md) · [hiệu năng](docs/PERFORMANCE.md)
+Tài liệu: [hướng dẫn triển khai, mục 0 là trạng thái thực tế](Huong_dan_trien_khai_Phan_B_Image_Retrieval.md) · [kiến trúc và sơ đồ](docs/ARCHITECTURE.md) · [cách làm test case](docs/TESTING.md) · [hiệu năng](docs/PERFORMANCE.md)
 
 ## Chạy từ đầu
 
@@ -49,21 +49,22 @@ Mở http://localhost:8080. Kiểm tra: `curl localhost:8080/health/ready`.
 ```bash
 pip install -r backend/requirements-dev.txt
 export DATABASE_URL=postgresql://capstone:capstone@localhost:5433/capstone
-python eval/make_testcases.py --per-type 40 > eval/testcases.jsonl
+python eval/make_testcases.py --per-type 1500 > eval/testcases.jsonl
 python eval/run_eval.py --api http://localhost:8080
 python eval/run_load.py --host http://localhost:8080 --users 1 5 10 20 --duration 60
+python eval/run_scale.py --workers 1 2 4 --users 32 --duration 60   # throughput theo số process API
 ```
 
-Kết quả ở `reports/eval_report.md` và `reports/load_report.md`.
+Kết quả ở `reports/eval_report.md`, `reports/load_report.md` và `reports/scale_report.md`. Số process API đặt bằng `API_WORKERS` trong `.env` (mặc định 1); xem `docs/PERFORMANCE.md` mục 3b.
 
 ## Quan hệ cho multi-hop
 
 Hệ thống không đoán quan hệ giữa người với người: nó chỉ trả lời những gì có trong hai file:
 
 - `data/relations/entities_extra.csv`: người/tổ chức/địa điểm chưa có trong CSV ảnh (`name, entity_type, gender, aliases, entity_id`; alias cách nhau bằng `|`).
-- `data/relations/relations.csv`: `subject, predicate, object, source_url, evidence, verified`. Predicate gồm `parent_of`, `spouse_of`, `founded`, `member_of`, `located_in`. "Con trai" là `parent_of` + người đích có `gender=male`.
+- `data/relations/relations.csv`: `subject, predicate, object, source_url, evidence, verified`. Predicate gồm `parent_of`, `spouse_of`, `sibling_of`, `founded`, `member_of`, `located_in`. "Con trai" là `parent_of` + người đích có `gender=male`; anh chị em còn được suy ra khi hai người có chung bố hoặc mẹ.
 
-Sau khi sửa, chạy lại `docker compose --profile jobs run --rm worker python -m app.jobs.relations_import` rồi `... python -m app.jobs.finalize` và `docker compose restart api`.
+Sau khi sửa, chạy lại `docker compose --profile jobs run --rm worker python -m app.jobs.relations_import` rồi `docker compose restart api`. Sau khi sửa code backend, build lại cả `worker` (`docker compose --profile jobs build worker`) lẫn `api`, nếu không job sẽ chạy code cũ.
 
 Các dòng mẫu hiện có lấy từ Wikipedia và **cần kiểm tra lại trước khi nộp**.
 
@@ -107,7 +108,7 @@ Frontend: `cd frontend && npm ci && npm run dev` (proxy `/api` sang `localhost:8
 
 1. **backend**: ruff + pytest với Postgres pgvector thật (encoder giả `hash`, không cần tải model).
 2. **frontend**: `npm ci` + build TypeScript.
-3. **docker**: build image `api` và `web`; với PR thì dựng cả stack và gọi thử `/api/search`; với push lên `main` thì đẩy image lên GitHub Container Registry.
+3. **docker**: build image `api` và `web`; với PR (hoặc bấm Run workflow trong tab Actions) thì dựng cả stack, gọi thử `/api/search` rồi chạy load test Locust 5 và 20 người dùng, báo cáo hiện ở tab Summary và tải được ở artifact `load-report`; với push lên `main` thì đẩy image lên GitHub Container Registry.
 4. **deploy** (tùy chọn): nếu repo có secret `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` (và `DEPLOY_PATH`), SSH vào server, kéo image mới và khởi động lại.
 
 Trên server có domain, chạy kèm Caddy để có HTTPS tự động:

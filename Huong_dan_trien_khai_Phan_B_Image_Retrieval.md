@@ -2,16 +2,19 @@
 
 **Đích triển khai:** web tìm kiếm trên ít nhất 80.000 ảnh, hỗ trợ single intent, multi-intent và multi-hop, đo latency dưới 3 giây và giảm phụ thuộc vào LLM.
 
-**Phiên bản:** 2 — cập nhật ngày 18/10/2026 sau khi đối chiếu hai CSV và ảnh tư vấn. **Ngày thiết kế:** 18/10/2026. **Deadline dự án:** 22/10/2026. **Đối tượng sử dụng:** intern biết Python, SQL và HTTP API, có người review các quyết định về dữ liệu và đánh giá.
+**Phiên bản:** 3 — cập nhật ngày 20/10/2026 theo code đã triển khai (phiên bản 2: 18/10/2026, sau khi đối chiếu hai CSV và ảnh tư vấn). **Ngày thiết kế:** 18/10/2026. **Deadline dự án:** 22/10/2026. **Đối tượng sử dụng:** intern biết Python, SQL và HTTP API, có người review các quyết định về dữ liệu và đánh giá.
 
 Tài liệu này là bản thiết kế và hướng dẫn triển khai. Các cấu hình, ngưỡng, ngân sách thời gian và chỉ tiêu đề xuất là điểm bắt đầu cho thí nghiệm; chúng chưa phải kết quả benchmark của hệ thống đã chạy. Các lệnh `python -m app.jobs...` mô tả giao diện CLI cần xây theo cấu trúc trong tài liệu, không phải công cụ đã có sẵn sau khi cài thư viện. Các đoạn ghi **mã khung** cần được nối với repository, cấu hình và dependency thực tế.
 
 **Thay đổi chính ở phiên bản 2:** bỏ giả định mọi CSV có 24 cột; dùng adapter có cấu hình và staging chuẩn; bổ sung import nhiều file, giữ lịch sử nhãn, xử lý thiếu metadata và cập nhật tăng dần. Phần scale được chuyển thành thí nghiệm có tiêu chí về chất lượng, latency, throughput và chi phí. Mã adapter ở mục 7 đã chạy trên cả hai CSV được gửi; các đoạn còn lại vẫn là thiết kế/mã khung, chưa phải ứng dụng hoàn chỉnh.
 
+**Thay đổi ở phiên bản 3:** thêm [mục 0](#s00) đối chiếu thiết kế với code đã chạy: pgvector thay Qdrant, text encoder chạy ONNX, các job import thực tế, quan hệ anh chị em, ngưỡng không có kết quả, gom entity trùng của một người, sửa lỗi gõ sai, bộ eval khoảng 3.000 câu và kết quả đo. Các mục có phần làm khác thiết kế được đánh dấu bằng khung **Đã triển khai (v3)**.
+
 **Cách dùng tài liệu để code:** đọc mục 1–2 trước; làm B01–B04 ở mục 20 để nhập được cả hai schema; sau đó làm search và web ở mục 8–16; chỉ thêm tối ưu nâng cao sau benchmark mục 17–19. Không cần làm mọi phần mở rộng trước deadline.
 
 ## Mục lục
 
+0. [Trạng thái triển khai thực tế (v3)](#s00)
 1. [Quyết định kỹ thuật và phạm vi](#s01)
 2. [Đọc đúng dữ liệu đầu vào](#s02)
 3. [Cơ sở nghiên cứu và cách áp dụng](#s03)
@@ -35,6 +38,104 @@ Tài liệu này là bản thiết kế và hướng dẫn triển khai. Các c�
 21. [Nguồn tham khảo](#s21)
 22. [Thuật ngữ](#s22)
 
+<a id="s00"></a>
+## 0. Trạng thái triển khai thực tế (phiên bản 3)
+
+Mục này đối chiếu bản thiết kế bên dưới với code đã chạy trong repository, cập nhật ngày 20/10/2026. Các mục 1–22 giữ nguyên lập luận thiết kế; chỗ nào code làm khác thì có khung **"Đã triển khai (v3)"** ngay dưới tiêu đề mục đó. Khi hai nơi khác nhau, **code và mục 0 là bản đúng**.
+
+### 0.1 Kết quả hiện có
+
+| Chỉ tiêu | Kết quả | Nguồn |
+|---|---|---|
+| Ảnh đang phục vụ | 90.327 ảnh phân biệt (theo SHA-256), có thumbnail và vector SigLIP 2 | `GET /api/corpus/stats`, `data/reports/corpus_funnel.json` |
+| Bộ test tự động | 3.162 câu sinh từ nhãn approved và bảng quan hệ (single 1.507, multi-intent 842, multi-hop 605, câu dễ sai 208), gồm ca dương tính, âm tính và ca dễ sai; bảng chất lượng dưới đây là lần chạy 20/10 với bộ cũ 2.998 câu | `eval/make_testcases.py --per-type 1500` |
+| Latency (lần chạy 20/10 07:47, 3.176 câu, SigLIP thật, cache tắt, từng câu một) | 0 câu ≥ 3 s; max 438 ms; p99 single 176 ms, multi-intent 91 ms, multi-hop 5 ms | `reports/eval_report.md` |
+| Throughput (Locust qua Nginx, 20/10 07:52) | 20 người dùng: 18,8 RPS, p99 120 ms, 0 lỗi trên 1.122 request; RPS tăng tuyến tính 1,0 → 4,8 → 9,4 → 18,8, chưa bão hòa | `reports/load_report.md` |
+| Scale (20/10 08:46, 32 người không nghỉ, Locust trong mạng Docker) | 1 worker: 292 RPS bão hòa, p99 460 ms, 0 lỗi trên 17.382 request; 4 worker chỉ +24% RPS nhưng RAM 1,9 → 6,4 GB, p99 910 ms nên giữ 1 worker | `reports/scale_report_docker.md`, `docs/PERFORMANCE.md` mục 3b |
+| Gọi LLM | 0 lần trên toàn bộ test: mọi câu đi qua bộ luật | cột `LLM calls` trong báo cáo |
+| Unit + integration test | 54 test, chạy trong CI với Postgres pgvector thật | `backend/tests`, `.github/workflows/ci.yml` |
+
+Chất lượng lần chạy 20/10 07:47 trên máy demo, 3.176 câu (precision@10 = tỷ lệ ảnh trong top 10 có nhãn đúng người; status = trả đúng trạng thái mong đợi):
+
+| Loại | Số câu | Status đúng | Nhận đúng loại câu | Precision@10 |
+|---|---:|---:|---:|---:|
+| Single | 1.507 | 99% | 100% | 95% |
+| Multi-intent | 842 | 99% | 98% | 96% |
+| Multi-hop | 605 | 98% | 98% | 97% |
+| Câu dễ sai (không được trả ảnh sai) | 222 | 96% | | |
+
+So với lần chạy 19/10 trước khi sửa: gõ sai tên 44% → 84%, "chụp cùng" 61% → 82%, câu dễ sai 58% → 96%, nhận đúng câu multi-intent 86% → 98%. Chi tiết từng biến thể ở bảng "By variant" của báo cáo.
+
+### 0.2 Đối chiếu từng phần
+
+| Phần trong hướng dẫn | Thiết kế ban đầu | Đã triển khai | Lý do |
+|---|---|---|---|
+| Stack (1.2, 4.3) | FastAPI + PostgreSQL + **Qdrant** + React | FastAPI + PostgreSQL 16 + **pgvector HNSW** + React | Hướng dẫn đã nêu pgvector là phương án ít service hơn. 90K × 768 float32 chỉ khoảng 264 MiB; một DB giữ metadata, quan hệ, full-text và vector nên không phải đồng bộ hai nơi (mục 6.3, 19.5) và compose chỉ còn 3 service |
+| Encoder (8.1) | SigLIP 2 base qua Transformers | Giữ `google/siglip2-base-patch16-224`. Worker dùng torch để embed ảnh; API chỉ chạy **text tower bằng ONNX Runtime** | Image API khoảng 520 MB thay vì khoảng 2 GB nếu có torch; `export_onnx` kiểm tra vector ONNX khớp torch trước khi dùng |
+| Python (5.2) | 3.11, pip-tools | 3.12, `requirements-api.txt`, `requirements-worker.txt`, `requirements-dev.txt` ghim phiên bản | Image chính thức `python:3.12-slim-bookworm`; tách API và worker để image API không kéo torch |
+| Cấu trúc repo (5.1) | `ingestion/`, `repositories/`, nhiều profile JSON | `backend/app/{services,jobs}`, một file `backend/config/import_profiles.json` | Gộp lại cho vừa thời gian; mỗi trách nhiệm trong bảng 5.1 vẫn có chỗ tương ứng (xem khung ở 5.1) |
+| Schema (6.2) | `import_batches`, `image_search`, `identity_status`, payload Qdrant | `entities`, `entity_aliases`, `links`, `fetches`, `images` (có cột `embedding` và `search_tsv`), `image_entities`, `relations` | Vector và văn bản tìm kiếm nằm ngay trong `images` nên không có bảng dẫn xuất phải đồng bộ |
+| Import (7) | audit → khóa manifest → import → plan_assets → fetch → prepare → embed → build_index → validate → activate | `import_csv` → `download` (gồm thumbnail) → `embed` → `relations_import` → `finalize` → `export_onnx`; `pipeline` chạy cả chuỗi | Giữ các nguyên tắc chính: map cột theo **tên** qua profile, khóa `(file, dòng)` để chạy lại không nhân bản, dedup theo SHA-256, nhãn mâu thuẫn thành `unknown` (không last-write-wins), resume mọi bước. `finalize` in phễu dữ liệu thay cho `validate_snapshot` |
+| Entity linking (9.1) | Alias exact, pg_trgm top-5, ngưỡng chọn trên dev | Từ điển alias trong RAM, ba tầng: alias chính xác > tên rút gọn bỏ chức danh và phần trong ngoặc > vài chữ đầu của tên. Gõ sai sửa bằng pg_trgm **và** chỉ mục "lệch một chữ cái", chỉ nhận khi cùng số từ và lệch tối đa 1 ký tự (2 với tên từ 12 ký tự) | Trigram bỏ qua thứ tự từ ("Bác Hồ" khớp "Hồ Bắc", "Tòng Thị Phóng" khớp "Phạm Thị Hồng"), nên cần điều kiện khoảng cách chỉnh sửa |
+| Parser (10) | Rule trước, LLM fallback một lần | Đúng như thiết kế; LLM (Anthropic) chỉ bật khi có `ANTHROPIC_API_KEY`, tối đa một lần gọi, có timeout | |
+| No-answer (11.4) | Chọn ngưỡng trên dev | `min_visual_score = 0.148` hiệu chỉnh bằng `app.jobs.calibrate` (ảnh vắng mặt tối đa 0,139, có mặt từ 0,158); tìm văn bản toàn kho phải khớp **cụm từ đúng thứ tự**. Khi hai nhánh này chưa đủ top-k, thêm ảnh có mô tả khớp nhiều cặp từ nhất của câu rồi xếp lại theo vector | Tránh trả ảnh không liên quan cho câu không có đáp án, nhưng không để câu cảnh hợp lệ như "người mặc áo dài" chỉ ra 3 ảnh |
+| Multi-intent (12) | groups / OR / same-photo | Đúng như thiết kế; thêm dấu phẩy làm dấu tách; "chụp cùng" gom các entity trùng của một người thành một nhóm khi lấy giao | Xem 0.3 |
+| Multi-hop (13) | Predicate `has_son`, có `valid_from/valid_to` | Predicate `parent_of`, `spouse_of`, `sibling_of`, `founded`, `member_of`, `located_in`; "con trai/con gái" = `parent_of` + lọc giới tính; tối đa 2 bước, frontier 50; **130 quan hệ có nguồn** trong `data/relations/relations.csv` | Ít predicate hơn mà hỏi được từ cả hai phía (bố/mẹ ↔ con). Chưa có khoảng hiệu lực thời gian (xem 0.5) |
+| API (14.1) | 7 endpoint | Có `/health/live`, `/health/ready`, `POST /api/search`, `/api/entities/suggest`, `/api/corpus/stats`. Chưa có `/api/images/{id}` và `/metrics` | Chi tiết ảnh đã nằm trong `items` của kết quả search |
+| Frontend (15) | Form, groups, làm rõ, bằng chứng quan hệ | Đủ các phần đó, thêm câu ví dụ theo 3 loại, nút × (và phím Esc) xóa câu hỏi, hủy request đang chạy và đưa trang về trạng thái ban đầu | |
+| Docker, CI (16) | Compose có Qdrant, migration chạy tay | Compose `db` (pgvector 0.8.0-pg16), `api`, `web`, `worker` (profile `jobs`); migration tự chạy khi API và job khởi động; GitHub Actions: ruff → pytest → build → dựng stack thử → đẩy image lên GHCR → deploy SSH tùy chọn; `compose.prod.yaml` thêm Caddy HTTPS | |
+| Đánh giá (17) | 300 câu viết tay + qrels chấm tay, nDCG, baseline B0–P2 | Khoảng 3.000 câu **sinh tự động** từ nhãn approved và quan hệ đã kiểm chứng, chấm tự động theo entity; câu mô tả cảnh để riêng trong `eval/manual_cases.jsonl` để chấm bằng mắt | 300 câu chấm tay không kịp hạn và quá ít so với 90K ảnh; đáp án theo entity chấm lại được mỗi lần sửa code. Đổi lại chưa có nDCG và chưa chạy ablation B0–P2 (xem 0.5) |
+| Load test (18) | Locust | `eval/run_load.py` (bọc Locust), tự sinh `reports/load_report.md` | |
+
+### 0.3 Phần bổ sung ngoài hướng dẫn và lý do
+
+| Bổ sung | Vì sao cần |
+|---|---|
+| Quan hệ anh chị em (`sibling_of`): ghi trực tiếp hoặc suy ra khi hai người có chung bố/mẹ, lọc giới tính | Người dùng hỏi "em gái của Phạm Thu Hương" (đáp án Phạm Thúy Hằng); bảng quan hệ ban đầu không có loại này. Migration `002_sibling_relation.sql` |
+| "Vợ cũ/chồng cũ", "X và vợ", danh xưng (bầu, GS, TS, NSND, NSƯT, MC) | Các cách hỏi thật phát hiện khi thử bằng tên trong dữ liệu |
+| Quan hệ không hỗ trợ ("bạn thân của X") trả `no_verified_relation`, **không** trả ảnh của X | Trước đó hệ thống bỏ qua chữ "bạn thân" và trả ảnh của chính X |
+| Gom entity trùng của một người theo tên (bỏ chức danh và phần trong ngoặc, giữ dấu thanh) | Crawl tạo nhiều entity cho một người ("MC Trấn Thành", "Cặp đôi MC Trấn Thành - Hari Won"); không gom thì mất ảnh và "chụp cùng" trả rỗng. Giữ dấu thanh để Trấn Thành và Trần Thành vẫn là hai người |
+| Tên viết hoa không khớp ai trong kho ("Jack Ma", "Taylor Swift") trả `no_seed_entity` | Tìm theo hình với một tên lạ chỉ ra người lạ trông giống (đúng cảnh báo ở 11.1) |
+| Chữ "ảnh/hình" ở đầu câu không bị nhận thành tên "Anh ..." | Lỗi thật: "ảnh Trần Minh Dũng" từng khớp "Anh Trần ..." |
+| Eval có nhóm "câu dễ sai" (robustness) và bảng "By variant" | Tách được chỗ yếu: gõ sai, tên đảo thứ tự, người không có trong data, chuỗi vô nghĩa |
+| Kiểm tra quy mô bằng ảnh tổng hợp (`synth_scale`) | Đo latency 80K khi chưa tải xong ảnh thật, xóa được sau khi đo |
+| Hỏi quan hệ không nói giới tính: "em của", "anh của", "con của", "con ruột của", "bố mẹ của", "vợ chồng của", "anh chị em ruột của", "bà xã/ông xã/phu nhân của" | "em của Phạm Thu Hương" từng trả không có quan hệ vì bộ luật chỉ biết "em gái/em trai". "ảnh của X" vẫn là ảnh của X, không bị hiểu thành "anh của" |
+| Câu mô tả không có tên: khi ảnh vượt ngưỡng và cụm đúng thứ tự chưa đủ top-k, thêm ảnh có mô tả khớp nhiều cặp từ liền nhau nhất ("áo dài", "sân khấu"), xếp lại theo vector; cặp từ trùng tên người khi bỏ dấu ("công viên" và Văn Công Viễn) không tính; địa danh sau "ở/tại" chỉ góp vào xếp hạng | Báo cáo 20/10: hai ví dụ của đề "bãi biển Nha Trang" và "hồ bơi và công viên nước ở Phú Quốc" trả rỗng, "người mặc áo dài" chỉ ra 3 ảnh Bảo Đại |
+| Sửa lỗi gõ phải giữ dấu đã gõ; câu toàn chữ thường không dấu chỉ được sửa khi cụm đó không có trong mô tả ảnh nào | "người mặc áo dài" từng bị sửa thành "Bảo Đại", "ca sĩ đang hát" thành "Đặng Tất" |
+| CI chạy load test Locust trên stack vừa dựng và đính kèm `load_report.md` | Đáp ứng điểm cộng "load test tự động, reproducible, báo cáo tự sinh" |
+| Quan hệ của một tên một chữ không có trong kho ("con trai của Bear", "bạn thân của Trang") trả "không nhận ra tên" | Trước đó cả câu thành mô tả và trả ảnh các bé trai không liên quan (eval 20/10, nhóm negative/missing_relation) |
+| Scale trên một máy bằng nhiều process API: `API_WORKERS` (uvicorn `WEB_CONCURRENCY`), `DB_POOL_MAX` mỗi process, migration có advisory lock; `eval/run_scale.py` đo 1/2/4 worker và ghi `reports/scale_report.md` | Một process Python bị GIL và một khe encode giới hạn; load test 20/10 cho thấy RPS còn tăng tuyến tính nên chưa biết trần. Làm theo mục 19.3 (Mức 1–2), không cần Kubernetes (19.6) |
+| Tên đầy đủ không có trong kho nhưng mở đầu giống tên người khác ("Nguyễn Chí Thanh", "Bùi Hải Linh") trả "không nhận ra tên", kể cả gõ thường hoặc không dấu; eval thêm nhóm `partial_name` | "Nguyễn Chí Thanh" từng gợi ý Nguyễn Chí Thiện, Nguyễn Chí Dũng, tìm chữ "thanh" như mô tả, và cùng lúc báo không nhận ra tên |
+
+### 0.4 Cách chạy hiện tại
+
+Lệnh đầy đủ nằm trong `README.md`; tóm tắt:
+
+```bash
+docker compose --profile jobs build worker
+docker compose --profile jobs run --rm worker python -m app.jobs.download_model
+docker compose --profile jobs run --rm worker          # pipeline offline, chạy lại sẽ tiếp tục
+docker compose up -d --build                           # web ở http://localhost:8080
+
+# sau khi sửa data/relations/*.csv
+docker compose --profile jobs run --rm worker python -m app.jobs.relations_import
+docker compose restart api
+
+# đánh giá (PowerShell: giữ nguyên, ${PWD} là thư mục dự án)
+docker compose --profile jobs run --rm -e PYTHONPATH=/app -v "${PWD}/eval:/app/eval" -v "${PWD}/reports:/app/reports" worker sh -c "python eval/make_testcases.py --per-type 1500 > eval/testcases.jsonl && python eval/run_eval.py --api http://api:8000 --cases eval/testcases.jsonl --out reports"
+```
+
+Sau mỗi lần sửa code backend phải build lại **cả** `worker` và `api`: worker là image riêng, quên build lại thì job chạy code cũ.
+
+### 0.5 Chưa làm hoặc làm khác, cần nói rõ khi bảo vệ
+
+- Load test với SigLIP thật phải chạy trên máy demo (`eval/run_load.py`, lệnh ở `docs/PERFORMANCE.md` mục 4); CI chỉ chạy load test trên bộ dữ liệu mẫu nên con số CI không dùng để báo cáo.
+- Kho gần như toàn ảnh người nên câu cảnh như ví dụ của đề chỉ có vài ảnh khớp (8 mô tả có "bãi biển", 1 có "hồ bơi"); câu cảnh chưa có đáp án tự động, chấm bằng mắt ở mục "Manual cases" của báo cáo.
+- Chưa có qrels chấm tay, nDCG và ablation B0–P2; độ chính xác đo theo nhãn entity nên chưa nói được ảnh có đúng hoạt động ("đang hát") hay không.
+- 130 quan hệ lấy từ nguồn công khai, cần người duyệt lại (`relations_review.md`). Chưa có khoảng hiệu lực thời gian; chưa phân biệt anh/chị với em vì thiếu năm sinh.
+- Chưa có `audit_csv`, manifest khóa checksum, `identity_status` và cửa sổ activate snapshot như mục 7 và 8.5; cập nhật dữ liệu hiện chạy lại job rồi restart API.
+- Gom entity theo tên có thể gộp hai người khác nhau trùng đúng tên có dấu; tên một từ gõ sai ("Rhymastic") không được sửa; quy tắc tên lạ dựa vào chữ hoa và họ phổ biến nên câu gõ toàn chữ thường không được kiểm tra.
+
 <a id="s01"></a>
 ## 1. Quyết định kỹ thuật và phạm vi
 
@@ -45,6 +146,8 @@ Tài liệu này là bản thiết kế và hướng dẫn triển khai. Các c�
 Đây là đánh giá về tính khả thi của dự án, không phải khẳng định B luôn dễ hơn. Hai phần khó nhất của B là độ tin cậy của liên kết ảnh–entity và dữ liệu quan hệ cho multi-hop. Chỉ có vector database không giải quyết được hai vấn đề đó.
 
 ### 1.2 Phương án chốt để code
+
+> **Đã triển khai (v3):** dùng **PostgreSQL + pgvector** thay Qdrant (lý do ở [mục 0.2](#s00)). Ba tín hiệu trong bảng dưới vẫn tách đúng như thiết kế: tên qua metadata, cảnh qua vector, quan hệ qua bảng SQL.
 
 **FastAPI + PostgreSQL + Qdrant + React/TypeScript.** Một model pretrained đa ngôn ngữ tạo embedding ảnh/văn bản trong cùng không gian. Các truy vấn đơn giản được phân tích bằng từ điển entity và quy tắc; LLM chỉ là fallback để tạo kế hoạch truy vấn có cấu trúc. Quan hệ được chuẩn bị offline và tra bằng SQL.
 
@@ -280,6 +383,8 @@ LLM chỉ được trả cấu trúc truy vấn. Nó không sinh SQL tùy ý, kh
 
 ### 4.3 Vì sao chọn các thành phần này
 
+> **Đã triển khai (v3):** dòng Qdrant trong bảng được thay bằng pgvector HNSW (cosine, `m=16`, `ef_construction=128`) nằm trong cùng PostgreSQL; cache là LRU 512 kết quả trong process. Model inference ở API chỉ có text tower ONNX.
+
 | Thành phần | Quyết định |
 |---|---|
 | FastAPI | Python thuận tiện nối ML inference, DB và API; không làm CPU inference trực tiếp trên event loop |
@@ -310,6 +415,8 @@ Không nên đưa model weights và 80K ảnh vào image Docker. Mount model sna
 ## 5. Môi trường và cấu trúc repository
 
 ### 5.1 Cách tổ chức
+
+> **Đã triển khai (v3):** repo thật gọn hơn bảng dưới: `backend/app/services/` (encoder, entity_linker, query_parser, retriever, relations, search, llm), `backend/app/jobs/` (import_csv, download, embed, relations_import, finalize, export_onnx, pipeline, calibrate, synth_scale, download_model), `backend/config/import_profiles.json`, `backend/migrations/00x_*.sql`, `eval/` (make_testcases, run_eval, run_load, locustfile, manual_cases.jsonl), `docs/` (ARCHITECTURE, TESTING, PERFORMANCE). Không có `ingestion/` và `repositories/` riêng; SQL nằm trong từng service.
 
 Tạo thư mục `image-retrieval-b` với các đường dẫn sau. Mỗi dòng là một file hoặc thư mục cần xây, không phải file đã được tài liệu này tạo ra.
 
@@ -352,6 +459,8 @@ Tạo thư mục `image-retrieval-b` với các đường dẫn sau. Mỗi dòng
 
 ### 5.2 Dependency và lockfile
 
+> **Đã triển khai (v3):** Python 3.12; phiên bản ghim trong `backend/requirements-api.txt` (không torch), `requirements-worker.txt` (torch CPU, transformers) và `requirements-dev.txt` (pytest, ruff, locust). Không dùng `qdrant-client`.
+
 Python 3.11 là baseline môi trường của thiết kế. Dependency trực tiếp đề xuất: `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`, `psycopg[binary,pool]`, `qdrant-client`, `httpx`, `Pillow`, `numpy`, `torch`, `transformers`, `sentencepiece`, `protobuf`, `pytest`, `locust`. Dùng `pip-tools` hoặc công cụ lock tương đương để đóng băng phiên bản.
 
 Đoạn encoder trong tài liệu viết theo giao diện Transformers **4.57.2** [D2]. Có thể bắt đầu bằng phiên bản đó; không nâng phiên bản lớn tự động trước ngày nộp. Chọn torch CPU wheel hoặc CUDA wheel theo máy; cài CUDA không phù hợp có thể làm image rất lớn hoặc không chạy.
@@ -389,6 +498,8 @@ erDiagram
 ```
 
 ### 6.2 Migration khởi đầu
+
+> **Đã triển khai (v3):** schema thật ở `backend/migrations/001_init.sql` và `002_sibling_relation.sql`, tự áp dụng khi API hoặc job khởi động. Bảng: `entities`, `entity_aliases`, `links` (một dòng CSV, khóa `(source_file, row_no)`), `fetches` (locator đã tải), `images` (gồm `embedding vector(768)` và `search_tsv`), `image_entities` (nhãn hiệu lực), `relations`. Sơ đồ ở `docs/ARCHITECTURE.md` mục 4. SQL dưới đây là thiết kế đầy đủ hơn, chưa dùng.
 
 SQL dưới đây là schema khởi đầu; UUID do Python tạo và truyền vào. Giữ một snapshot cố định cho benchmark. `image_search` là bảng dẫn xuất, có thể dựng lại từ dữ liệu chuẩn.
 
@@ -918,6 +1029,8 @@ Giữ tên gốc có dấu. Normalizer này dành cho Việt/Latin, cần mở r
 
 ### 7.5 Job và CLI cho nhiều file
 
+> **Đã triển khai (v3):** các job thật là `import_csv`, `download`, `embed`, `relations_import`, `finalize`, `export_onnx`, chạy tuần tự bằng `python -m app.jobs.pipeline` (mặc định của service `worker`), mỗi bước resume được, thử nhanh với `--limit 500`. `audit_csv`, `plan_assets`, `validate_snapshot`, `activate_snapshot` chưa làm; `finalize` in phễu `dòng CSV → approved → locator → tải được → ảnh phân biệt → có vector → đang phục vụ` vào `data/reports/corpus_funnel.json`.
+
 | Job cần xây | Đầu vào | Đầu ra |
 |---|---|---|
 | `audit_csv` | Glob hoặc manifest, registry profiles | File inventory, schema report, canonical counts, manifest khóa checksum |
@@ -1126,6 +1239,8 @@ Kiểm tra trước upload: không có NaN/Inf, norm gần 1, số IDs bằng s�
 
 ### 8.3 Tạo collection và payload index
 
+> **Đã triển khai (v3):** không dùng Qdrant. Vector nằm ở cột `images.embedding` với index HNSW cosine của pgvector; lọc theo người là `image_id IN (SELECT ... FROM image_entities ...)` trong cùng câu SQL (`backend/app/services/retriever.py`). `finalize` xóa HNSW trước khi cập nhật hàng loạt rồi dựng lại. Mã Qdrant ở 8.3–8.5 giữ lại để tham khảo.
+
 Mã khung theo Qdrant client; chọn version tương thích server [D3–D5]. Chạy với server riêng trong Docker, không dùng local in-memory client để báo cáo latency production.
 
 ```python
@@ -1208,6 +1323,8 @@ Qdrant có thể vẫn trả kết quả bằng full scan khi graph chưa dựng
 ## 9. Entity linking và chỉ mục văn bản
 
 ### 9.1 Xác định entity từ tên
+
+> **Đã triển khai (v3):** từ điển alias nạp vào RAM khi API khởi động (`entity_linker.py`), tìm khớp dài nhất trên câu đã bỏ dấu. Ngoài alias trong CSV còn tự tạo tên rút gọn ("Ca sĩ Bằng Kiều" → "Bằng Kiều", "Mỹ Tâm (queen Vpop)" → "Mỹ Tâm") và tên rút từ vài chữ đầu (bỏ nếu chung cho hơn 8 người). Các entity trùng của một người được gom lại; tên trùng nhiều người khác nhau thì trả lựa chọn để người dùng chọn. Gõ sai: chỉ nhận khi cùng số từ và lệch 1 ký tự (2 với tên từ 12 ký tự). Tên viết hoa không khớp ai thì trả `no_seed_entity`.
 
 Thực hiện theo thứ tự:
 
@@ -1344,6 +1461,8 @@ Executor còn kiểm tra: UUID tồn tại, tối đa số seed IDs, type của 
 
 ### 10.2 Rule parser ưu tiên trước
 
+> **Đã triển khai (v3):** bộ luật còn hiểu thêm: dấu phẩy và "hoặc" làm dấu tách; "vợ cũ/chồng cũ"; anh trai, em trai, chị gái, em gái, anh chị em; "X và vợ" (quan hệ áp vào người đứng trước); danh xưng đứng trước tên (bầu, GS, TS, NSND, NSƯT, MC...). Câu có "của" mà cụm đứng trước không phải quan hệ đã biết ("bạn thân của X") trả `no_verified_relation`. Cách hỏi không nói giới tính cũng được hiểu: "em của", "anh của" (chỉ khi gõ đúng chữ "anh" có dấu, "ảnh của X" vẫn là ảnh của X), "con của", "con ruột của", "bố mẹ của", "vợ chồng của", "anh chị em ruột của", "bà xã/ông xã/phu nhân của".
+
 Hỗ trợ trước các dạng:
 
 | Mẫu câu | QueryPlan |
@@ -1428,6 +1547,8 @@ def fuse_rrf(rankings: list[list[str]], weights=None, k_rrf=60):
 
 ### 11.4 Không kết luận relevance từ RRF score
 
+> **Đã triển khai (v3):** câu chỉ có mô tả, không có tên, chỉ nhận ảnh có cosine ≥ `min_visual_score = 0.148` (hiệu chỉnh bằng `python -m app.jobs.calibrate`, kết quả ở `data/reports/calibration.json`), và nhánh full-text toàn kho phải khớp cả cụm từ theo đúng thứ tự. Nếu hai nhánh đó chưa đủ top-k, thêm ảnh có mô tả khớp nhiều cặp từ liền nhau nhất của câu (ít nhất một nửa số cặp, trừ khi không ảnh nào khớp được nhiều như vậy) và xếp lại theo độ giống hình (`lexical_partial`, `rank_by_vector` trong `retriever.py`).
+
 Vector search luôn có thể trả một số ảnh gần nhất, ngay cả khi tất cả đều không phù hợp. RRF chỉ tổ chức thứ hạng; ngưỡng RRF không tự trở thành xác suất “ảnh đúng”.
 
 Thiết kế no-answer trên dev: dùng eligibility, entity/path evidence, raw similarity đã hiệu chỉnh theo nhóm query, top-score margin và các kiểm tra nội dung bổ sung nếu có. Nếu chỉ dùng visual similarity, công bố độ không chắc và đo no-answer precision/recall. Không chuyển cosine 0,8 thành “80% chính xác”.
@@ -1502,6 +1623,8 @@ Mục tiêu khởi đầu có thể là 50–100 cạnh verified trong 3–4 lo�
 
 ### 13.3 Format quan hệ
 
+> **Đã triển khai (v3):** format thật dùng tên thay UUID cho dễ duyệt: `data/relations/relations.csv` có cột `subject, predicate, object, source_url, evidence, verified`; người chưa có trong CSV ảnh khai báo ở `entities_extra.csv` (`name, entity_type, gender, aliases, entity_id`). Predicate: `parent_of`, `spouse_of`, `sibling_of`, `founded`, `member_of`, `located_in`. Hiện có 130 quan hệ (100 gia đình, công ty, nhóm nhạc và 30 cặp anh chị em). Chưa có `valid_from/valid_to`.
+
 Ví dụ format với giá trị giả minh họa, không import như dữ liệu thật:
 
 ```csv
@@ -1556,6 +1679,8 @@ Sau khi có targets, tìm ảnh bằng đường single intent. Nếu nhiều ta
 
 ### 13.6 Các kết quả khác nhau phải phân biệt
 
+> **Đã triển khai (v3):** trạng thái thật: `ok`, `partial`, `no_results`, `needs_clarification`, `no_verified_relation` (gồm cả quan hệ ngoài ontology, thay cho `unsupported`), `no_images_for_target`, `no_seed_entity` (không nhận ra tên người trong câu).
+
 | Trạng thái | Ý nghĩa |
 |---|---|
 | `ok` | Có path verified và có ảnh đích |
@@ -1570,6 +1695,8 @@ Giải thích hiển thị là đường dữ liệu như “Tổ chức X → n
 ## 14. Backend API và điều phối
 
 ### 14.1 Endpoint cần có
+
+> **Đã triển khai (v3):** đã có `/health/live`, `/health/ready`, `POST /api/search` (thêm `?nocache=true` cho eval), `/api/entities/suggest`, `/api/corpus/stats`. Chưa có `/api/images/{image_id}` (thông tin ảnh đã nằm trong `items`) và `/metrics`. Response có thời gian từng bước `parse_ms`, `relation_ms`, `encode_ms`, `retrieval_ms`, `hydrate_ms`.
 
 | Method và route | Contract |
 |---|---|
@@ -1888,6 +2015,8 @@ server {
 
 ### 16.4 Compose mẫu
 
+> **Đã triển khai (v3):** `compose.yaml` thật có 4 service: `db` (`pgvector/pgvector:0.8.0-pg16`, cổng chỉ mở trên 127.0.0.1), `api`, `web` (Nginx, cổng 8080) và `worker` (profile `jobs`). Không có Qdrant. `compose.prod.yaml` thêm Caddy để có HTTPS.
+
 Đây là cấu hình cần hoàn thiện với image tag Qdrant đã smoke-test. Không có version được bịa như “đã benchmark”. `.env` phải khai báo `QDRANT_IMAGE` và `POSTGRES_PASSWORD`; dùng password dạng chuỗi URL-safe hoặc encode đúng khi xây DATABASE_URL.
 
 ```yaml
@@ -1964,6 +2093,8 @@ Qdrant service ở mẫu không giả định image có curl/wget. API/job tự 
 
 ### 16.5 Trình tự chạy lần đầu sau khi code xong
 
+> **Đã triển khai (v3):** trình tự thật ngắn hơn, xem [mục 0.4](#s00) và `README.md`. Không cần chạy migration bằng tay; sau mỗi lần sửa code phải build lại cả `worker` và `api`.
+
 1. Tạo `.env`, điền image version đã test; tạo `data/raw`, `data/derived`, `data/published`, `data/manifests`, `data/reports`, `models` và phân quyền. Đặt tất cả CSV gốc trong raw, tạo profiles và manifest mục 7. Docker image copy `backend/config`, không copy dữ liệu raw.
 2. Tải model snapshot riêng, kiểm tra license và lưu commit revision.
 3. `docker compose up -d db qdrant`.
@@ -1991,6 +2122,8 @@ Sau khi đổi active snapshot, restart API hoặc có cơ chế reload atomic �
 
 ### 16.6 CI và triển khai public
 
+> **Đã triển khai (v3):** `.github/workflows/ci.yml`: ruff + pytest với Postgres pgvector thật và encoder giả → build frontend → build image, dựng cả stack và gọi thử `/api/search` khi mở PR → chạy load test Locust trên stack đó và đính kèm `load_report.md` (tab Summary và artifact `load-report`) → push lên `main` thì đẩy image lên GHCR → deploy qua SSH nếu repo có secret `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`.
+
 CI tối thiểu: lint/typecheck → unit tests → integration PostgreSQL/Qdrant với fixtures nhỏ → build Docker → upload test report. E2E model thật chạy ở môi trường có model snapshot; không dùng mock embedding để tuyên bố chất lượng search.
 
 Deployment: reverse proxy HTTPS, env secrets, backup PostgreSQL/Qdrant snapshot và media manifest. Không expose 5432/6333 trực tiếp ra Internet. Smoke test sau deploy trước khi đổi traffic. Ghi rollback image digest và snapshot trước đó. Repo/CI/CD là điểm cộng; không để nó chiếm thời gian xây query quality.
@@ -2007,6 +2140,8 @@ Deployment: reverse proxy HTTPS, env secrets, backup PostgreSQL/Qdrant snapshot 
 `flag=approved` chỉ là eligibility. Một ảnh approved của Lê Thúy Anh chưa chắc phù hợp câu “đang cầm micro”. Không tự gán mọi ảnh của đúng entity là relevance 2 với tất cả câu hỏi.
 
 ### 17.2 Quy mô bộ test đề xuất
+
+> **Đã triển khai (v3):** thay vì 300 câu viết tay, `eval/make_testcases.py` sinh khoảng 3.000 câu từ toàn bộ dữ liệu: single (6 kiểu gõ: đủ tên, không dấu, gõ sai, tên + cảnh, có danh xưng, chữ hoa và dấu câu), multi-intent ("và", "hoặc", dấu phẩy, "chụp cùng" lấy từ ảnh thật có hai người khác nhau), multi-hop (mọi quan hệ hỏi từ mỗi phía, 2 bước, câu âm tính) và nhóm câu dễ sai (quan hệ không hỗ trợ, 30 người không có trong data như "Tập Cận Bình", tên đảo thứ tự, chuỗi vô nghĩa). Multi-hop có thêm biến thể hỏi không nói giới tính (`<quan hệ>_no_gender`: "con của", "bố mẹ của", "vợ chồng của", "em của"). Đáp án lấy từ nhãn approved và bảng quan hệ nên chấm tự động. Câu mô tả cảnh để ở `eval/manual_cases.jsonl` và chấm bằng mắt. Phương pháp chi tiết ở `docs/TESTING.md`.
 
 Khởi đầu 300 truy vấn: 100 single, 100 multi-intent, 100 multi-hop. Mỗi nhóm 20 dev và 80 test. Điều chỉnh quy mô theo số quan hệ thật đã xác minh; nếu chỉ có ít path thì công bố số path distinct, không dùng hàng chục paraphrase để che thiếu độ phủ.
 
@@ -2130,6 +2265,8 @@ Benchmark API phải bao gồm tokenization, embedding, entity linking, graph, L
 Khi so subsets 10K/40K/80K, giữ các relevant images của query để chất lượng không đổi chỉ vì đã xóa đáp án; bổ sung distractors thực. Với scope test độc lập, ghi cả tỷ lệ query còn answerable ở mỗi subset.
 
 ### 18.3 Locust mẫu
+
+> **Đã triển khai (v3):** `eval/run_load.py` chạy `eval/locustfile.py` theo các mức 1, 5, 10, 20 người dùng, trộn đều 3 loại câu, request quá 3 giây tính là lỗi, rồi ghi `reports/load_report.md`. `THINK=0` đo throughput bão hòa.
 
 File `eval/locustfile.py` dưới đây đọc query JSONL đã chuẩn bị. Nó đánh dấu latency >3 giây và status sai như lỗi SLO; quality ranking vẫn được chấm bằng evaluator riêng. Chạy backend với cache tắt ở config server cho baseline.
 
@@ -2306,6 +2443,8 @@ Khởi đầu thử `hnsw_ef` 64, 128, 256; top candidates 50, 100, 200. Giữ `
 
 **Mức 2 — khi đo ra hạn chế thật:** tách inference khỏi API để nhiều API replicas không nạp nhiều bản model; shared cache khi có nhiều replicas; object storage/CDN khi bandwidth/đĩa thành bottleneck. Cân nhắc nén vector hoặc đặt các cấu trúc ít truy cập trên disk nếu RAM thiếu. Qdrant có lựa chọn quantization/memory placement và rescoring [D14]; chúng đổi trade-off recall, CPU và I/O, không bảo đảm nhanh hơn trên model/dữ liệu này. Giữ full-precision baseline, đo ANN recall và relevance trước khi chốt. Tên tham số cần đúng server/client version đã pin.
 
+> **Đã triển khai (v3.2), trục "Người dùng/QPS tăng":** chạy nhiều process uvicorn trong container `api` (`API_WORKERS`), mỗi process một pool DB nhỏ (`DB_POOL_MAX`) và một khe encode; `eval/run_scale.py` dựng lại api với 1, 2, 4 worker, đo RPS bão hòa, p95/p99, CPU và RAM, rồi ghi `reports/scale_report.md`. Kết quả đo 20/10: 1 worker đã chịu 292 RPS bão hòa không lỗi (gấp khoảng 15 lần tải 20 người thực tế); 4 worker chỉ thêm 24% RPS nhưng RAM gấp 3,3 lần và p99 gấp đôi, vì encoder của câu mô tả tranh CPU với Postgres và Locust trên cùng máy. Vì vậy mặc định giữ 1 worker; bước scale tiếp theo hợp lý là tách encoder (Mức 2) hoặc thêm máy, không phải thêm process trên cùng máy.
+
 **Mức 3 — tùy thời gian và dữ liệu:** shard/replica, online outbox, rolling index rebuild. Replica phục vụ throughput/availability; shard chia corpus nhưng thêm fan-out/merge cost. Chỉ chuyển bước khi mức trước không đạt mục tiêu trên máy/tải được công bố. Một triệu vector không tự động đòi Kubernetes.
 
 Minh họa raw vector storage float32 d=768: 80K khoảng 234,4 MiB; 1M khoảng 2,86 GiB. Đây chỉ là `N × d × 4`, chưa gồm graph/payload/model/cache/temp segments/replica/ảnh; không dùng để chọn RAM container sát ngưỡng. Nén vector không giảm tương ứng dung lượng thumbnails hoặc chi phí download.
@@ -2409,6 +2548,8 @@ Giữ bắt buộc: đủ corpus, ba kiểu query trong phạm vi thật, nguồ
 Không bỏ multi-hop mà vẫn ghi đáp ứng đủ B. Không dùng câu hỏi hard-code làm demo duy nhất. Nếu không đủ dữ liệu/máy để đạt điều kiện, ghi rõ hạng mục chưa đạt thay vì suy diễn số liệu.
 
 ### 20.5 Checklist cuối
+
+> **Đã triển khai (v3):** trạng thái từng mục tính đến 20/10 nằm ở [mục 0.1](#s00) và [mục 0.5](#s00). Đã đạt: hai schema CSV, dedup theo nội dung, hơn 80K ảnh phục vụ, có/không dấu và trùng tên, multi-intent không mất nhánh, multi-hop có nguồn, trạng thái không có đáp án tách riêng, p50/p95/p99/max và số ca ≥ 3 s, token đo từ `usage`, Docker Compose và CI. Chưa đạt: qrels chấm tay, load test với encoder thật, cửa sổ activate snapshot.
 
 - [ ] Hai file thật parse được; profile/checksum/policy và missing fields có report.
 - [ ] CSV mới thêm/bớt/đổi thứ tự cột không buộc sửa search/frontend; profile lạ không tự publish.

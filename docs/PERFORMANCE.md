@@ -2,30 +2,62 @@
 
 ## 1. Con số trong file này là gì
 
-Các số dưới đây đo trong môi trường phát triển (máy cloud, không GPU) với **encoder giả `hash`** và **80.023 ảnh tổng hợp** (`synth_scale.py` sinh vector ngẫu nhiên). Chúng chứng minh phần tìm kiếm (HNSW, full-text, SQL quan hệ, API) chạy dưới 3 giây ở quy mô 80K, **chưa** gồm thời gian encode câu hỏi bằng SigLIP thật và **chưa** nói gì về độ chính xác.
+Số ở mục 2 đo trên máy chạy demo ngày 20/10/2026 với **dữ liệu thật** (90.327 ảnh đang phục vụ) và **SigLIP 2 thật** (`siglip-onnx:siglip2`, ONNX trên CPU), bằng `eval/run_eval.py`. Mục 3 là throughput từ load test Locust (`eval/run_load.py`). Đầu mỗi báo cáo tự ghi số ảnh, encoder và cấu hình máy.
 
-Số dùng để nộp phải đo lại trên máy chạy demo, với dữ liệu thật và `ENCODER_BACKEND=onnx`, bằng các lệnh ở mục 4. Các script tự ghi số ảnh đang phục vụ, encoder và cấu hình máy vào đầu báo cáo.
+## 2. Latency từng câu (dữ liệu thật, SigLIP thật)
 
-## 2. Kết quả trong môi trường phát triển (hash encoder, 80.023 ảnh)
+Đo ở client: từ lúc gửi HTTP request đến khi nhận đủ JSON, cache kết quả tắt, gửi tuần tự, top_k = 10, 5 câu warm-up không tính.
 
-| Loại truy vấn | Server time |
-|---|---|
-| Theo tên người / quan hệ (SQL) | khoảng 5–15 ms |
-| Mô tả tự do toàn kho (HNSW + full-text + RRF) | khoảng 110–230 ms |
+| Loại | Số câu | p50 | p95 | p99 | max | ≥ 3 s |
+|---|---:|---:|---:|---:|---:|---:|
+| Single intent | 1.507 | 3,4 ms | 53,8 ms | 176,4 ms | 438,0 ms | 0 |
+| Multi-intent | 842 | 3,0 ms | 4,4 ms | 90,5 ms | 165,4 ms | 0 |
+| Multi-hop | 605 | 2,8 ms | 4,4 ms | 5,3 ms | 80,5 ms | 0 |
+| Robustness | 222 | 11,0 ms | 61,4 ms | 94,6 ms | 134,1 ms | 0 |
 
-`run_eval.py`: 0 câu ≥ 3 s; single-intent p99 228 ms.
+Câu theo tên người và quan hệ chạy bằng SQL trên chỉ mục nên chỉ vài ms. Câu mô tả tự do toàn kho (encode SigLIP + HNSW + full-text + RRF) là nhóm chậm nhất, vẫn dưới 0,5 giây. 0 lần gọi LLM. Nguồn: `reports/eval_report.md` (20/10/2026 07:47, 3.176 câu).
 
-Locust 20 người dùng (nghỉ 0,5–1,5 s), cache tắt: khoảng 20 RPS, p99 tổng 290 ms, max 336 ms, 0 failure.
+## 3. Throughput (load test)
 
-Docker: image `api` khoảng 527 MB (không torch), `web` 74 MB; từ `docker compose up` đến `/health/ready` khoảng 12 s.
+Đo bằng `eval/run_load.py` (Locust headless) trên máy demo ngày 20/10/2026 07:52, qua Nginx `http://localhost:8080`, 90.327 ảnh, SigLIP 2 ONNX, máy 16 CPU. Mỗi mức chạy 60 giây, mỗi người dùng nghỉ 0,5 đến 1,5 giây giữa hai request, trộn đều 3 loại câu, cache kết quả tắt; request quá 3 giây tính là failure.
 
-Pipeline: `finalize` trên 80K ảnh mất khoảng 86 s (xóa HNSW trước khi cập nhật hàng loạt rồi dựng lại).
+| Người dùng | Request | Failure | RPS | p50 | p95 | p99 | max |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 50 | 0 | 1,0 | 58 ms | 97 ms | 110 ms | 108 ms |
+| 5 | 287 | 0 | 4,8 | 65 ms | 100 ms | 110 ms | 137 ms |
+| 10 | 560 | 0 | 9,4 | 60 ms | 90 ms | 100 ms | 149 ms |
+| 20 | 1.122 | 0 | 18,8 | 59 ms | 95 ms | 120 ms | 176 ms |
 
-## 3. Ước lượng phần còn thiếu khi dùng SigLIP thật
+RPS tăng gần tuyến tính theo số người dùng và latency không tăng, nên ở 20 người hệ thống chưa bão hòa. Muốn đo trần thì chạy thêm với `THINK=0`. Latency ở đây cao hơn mục 2 vì đi qua Nginx và Locust chạy chung máy. Nguồn: `reports/load_report.md`, CSV gốc trong `reports/load/`.
 
-Encode một câu hỏi bằng text tower SigLIP 2 base (ONNX, CPU 4 luồng) thường vài chục ms; câu multi-intent gom các ý định vào một batch nên chỉ encode một lần. Đây là ước lượng, cần đo lại: API trả `encode_ms` riêng trong mỗi response để kiểm tra.
+## 3b. Scale trên một máy: số process API
 
-Phần tốn thời gian nhất là **offline**: embed 80K ảnh bằng image tower trên CPU có thể mất vài giờ; trên GPU nhanh hơn nhiều. Bước này chạy một lần, resume được.
+**Cách làm.** Mỗi process API giữ một bản model ONNX, một khe encode (semaphore 1, mỗi lần encode dùng `ENCODER_THREADS` luồng) và một pool kết nối DB. Python có GIL nên một process chỉ dùng tốt khoảng một nhân cho phần parse và ghép kết quả; tăng throughput trên một máy là chạy nhiều process uvicorn (`API_WORKERS`, biến `WEB_CONCURRENCY` của uvicorn) sau cùng Nginx. Không cần thêm container, load balancer hay Kubernetes; đây là "Mức 1–2" ở mục 19.3 của file hướng dẫn.
+
+Ràng buộc khi chọn số worker:
+- `API_WORKERS × ENCODER_THREADS` không vượt số nhân CPU, nếu không các lần encode tranh nhau CPU.
+- `API_WORKERS × DB_POOL_MAX` dưới `max_connections = 50` của Postgres.
+- RAM tăng theo số worker vì mỗi worker nạp một bản text encoder.
+- Migration chạy lúc khởi động có advisory lock nên nhiều worker không chạy chồng nhau.
+
+**Cách đo.** `eval/run_scale.py` dựng lại container `api` với 1, 2, 4 worker (giữ nguyên `ENCODER_THREADS`), chờ `/api/corpus/stats` báo đúng số worker, chạy Locust không nghỉ giữa các request (closed loop, 32 người dùng, 60 s sau 10 s warm-up), lấy CPU và RAM của container bằng `docker stats`, rồi trả api về cấu hình trong `.env`. Locust dùng `FastHttpUser` để chính máy phát tải không thành nút thắt; nếu Locust báo CPU của nó vượt 90% thì báo cáo ghi rõ.
+
+**Kết quả** (máy demo 16 CPU, 20/10/2026 08:46, SigLIP 2 ONNX, 4 luồng encode mỗi worker, Locust chạy trong mạng Docker, nguồn `reports/scale_report_docker.md`):
+
+| Worker API | RPS bão hòa | so với 1 worker | p50 | p95 | p99 | max | Lỗi | CPU api | RAM api | CPU db |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 292 | 1,00 | 77 ms | 360 ms | 460 ms | 877 ms | 0 / 17.382 | 500% | 1,9 GB | 72% |
+| 2 | 276 | 0,94 | 84 ms | 360 ms | 480 ms | 1.011 ms | 0 / 16.377 | 658% | 2,8 GB | 62% |
+| 4 | 361 | 1,24 | 22 ms | 530 ms | 910 ms | 1.564 ms | 0 / 21.486 | 1.366% | 6,4 GB | 122% |
+
+Chạy cùng lệnh với Locust trên Windows (`reports/scale_report.md`) cho gần như cùng số (278 / 266 / 352 RPS), nên đường mạng từ Windows vào Docker không phải nút thắt.
+
+**Đọc kết quả:**
+- **Một process đã đủ dư.** 32 người gửi liên tục không nghỉ, 292 RPS, không câu nào lỗi hay quá 3 giây. Tải thực tế đo ở mục 3 (20 người, có nghỉ) là 18,8 RPS, tức khoảng 6% sức chứa.
+- **Thêm worker gần như không tăng throughput.** 4 worker chỉ thêm 24% RPS nhưng RAM gấp 3,3 lần và p99 gấp đôi. Câu theo tên nhanh hơn (p50 22 ms), câu mô tả cảnh chậm hơn vì mỗi worker encode 4 luồng và cùng tranh 16 nhân với Postgres, Nginx và Locust trên một máy. Nút thắt là CPU cho encoder SigLIP của câu mô tả, không phải số process.
+- **Cấu hình chọn:** giữ `API_WORKERS=1` (p99 tốt nhất, ít RAM nhất). Khi cần chịu tải lớn hơn mà không tăng p99, hướng hợp lý là tách encoder ra máy riêng hoặc GPU, hoặc thêm máy chạy replica api phía sau load balancer, thay vì tăng worker trên cùng máy. Hướng thử tiếp trên máy hiện tại: `ENCODER_THREADS` 1–2 với nhiều worker, và tắt spin-wait của onnxruntime (`session.intra_op.allow_spinning=0`) để luồng chờ không đốt CPU.
+
+Docker: image `api` khoảng 527 MB (không torch), `web` 74 MB; từ `docker compose up` đến `/health/ready` khoảng 12 s. `finalize` trên 80K ảnh khoảng 86 s (xóa HNSW trước khi cập nhật hàng loạt rồi dựng lại). Embed ảnh bằng image tower trên CPU là bước lâu nhất, chạy một lần và resume được.
 
 ## 4. Đo lại trên máy của bạn
 
@@ -34,14 +66,18 @@ pip install -r backend/requirements-dev.txt
 export DATABASE_URL=postgresql://capstone:capstone@localhost:5433/capstone
 
 # sinh test case từ dữ liệu thật
-python eval/make_testcases.py --per-type 40 > eval/testcases.jsonl
+python eval/make_testcases.py --per-type 1500 > eval/testcases.jsonl
 
 # độ chính xác + latency từng câu
 python eval/run_eval.py --api http://localhost:8080          # -> reports/eval_report.md
 
 # throughput theo số người dùng
 python eval/run_load.py --host http://localhost:8080 --users 1 5 10 20 --duration 60   # -> reports/load_report.md
-THINK=0 python eval/run_load.py --host http://localhost:8080 --users 10 --duration 60 --out reports/saturation
+python eval/run_load.py --host http://localhost:8080 --users 10 --duration 60 --no-think --out reports/saturation
+
+# scale theo số process API (dựng lại container api, cuối cùng trả về cấu hình .env)
+python eval/run_scale.py --workers 1 2 4 --users 32 --duration 60    # -> reports/scale_report.md
+python eval/run_scale.py --workers 1 2 4 --users 32 --duration 60 --in-docker   # Locust trong mạng Docker -> reports/scale_report_docker.md
 ```
 
 Khi chưa đủ 80K ảnh thật, có thể thêm ảnh tổng hợp để kiểm tra latency ở quy mô yêu cầu, rồi xóa đi:

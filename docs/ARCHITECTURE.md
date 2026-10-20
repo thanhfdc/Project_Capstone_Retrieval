@@ -66,12 +66,13 @@ flowchart TD
 |---|---|---|
 | Single intent, chỉ tên | Ảnh của người đó bằng SQL | "ảnh Mỹ Tâm" |
 | Single intent, tên + mô tả | Vector và full-text giới hạn trong ảnh của người đó, RRF | "Sơn Tùng đang biểu diễn" |
-| Single intent, chỉ mô tả | HNSW toàn kho + full-text, RRF | "bãi biển hoàng hôn" |
+| Single intent, chỉ mô tả | HNSW toàn kho (chỉ nhận ảnh vượt ngưỡng cosine) + full-text đúng cụm, RRF. Nếu chưa đủ top-k: thêm ảnh có mô tả khớp nhiều mảnh nhất của câu (cặp từ liền nhau như "áo dài", "sân khấu"), xếp lại theo độ giống hình | "người mặc áo dài", "bãi biển Nha Trang" |
 | Single intent, địa danh | Ảnh gắn với địa điểm và các địa điểm con (`located_in`), xếp theo mô tả | "bãi biển Nha Trang" |
 | Multi-intent "A và B" | Mỗi ý định một nhóm, chia đều top-k | "hồ bơi và công viên nước ở Phú Quốc" |
 | Multi-intent "A hoặc B" | Hợp nhất bằng RRF thành một danh sách | "Sơn Tùng hoặc Mỹ Tâm" |
 | Multi-intent "A chụp cùng B" | Giao: ảnh gắn với cả hai người | "Sơn Tùng chụp cùng Hà Anh Tuấn" |
 | Multi-hop 1 bước | Tra quan hệ ra người đích, rồi tìm ảnh người đó | "ảnh con trai chủ tịch Phạm Nhật Vượng" |
+| Multi-hop anh chị em | Quan hệ anh chị em ghi trực tiếp, hoặc suy ra khi hai người có chung bố/mẹ; lọc theo giới tính, chưa phân biệt anh/chị với em | "em gái của Phạm Thu Hương" |
 | Multi-hop 2 bước | Tra lần lượt, mỗi người đích một nhóm, có giải thích đường đi | "con trai của người sáng lập Vingroup" |
 
 Các trạng thái trả về được tách riêng để không nhầm "không có" với "lỗi": `ok`, `partial`, `no_results`, `needs_clarification`, `no_verified_relation`, `no_images_for_target`, `no_seed_entity`.
@@ -104,4 +105,11 @@ erDiagram
 - Multi-hop chỉ trả lời được quan hệ đã nhập vào `data/relations/relations.csv`; quan hệ chưa có trả `no_verified_relation` thay vì đoán.
 - Truy vấn địa điểm chỉ lọc chính xác khi địa điểm là một entity trong kho; nếu không, hệ thống dựa vào mô tả và vector (xếp hạng tương đồng, không phải bộ lọc chắc chắn).
 - SigLIP không hiểu phủ định ("không có người") và không nhận diện được mặt người theo tên; tên luôn đi qua metadata.
+- "anh trai", "em trai" cùng hiểu là anh chị em là nam (tương tự "chị gái", "em gái" là nữ): kho chưa có năm sinh nên chưa phân biệt lớn hay nhỏ tuổi.
 - "A chụp cùng B" dựa vào việc cùng một ảnh được gắn nhãn cho cả hai người; ảnh có hai người nhưng chỉ gắn một nhãn sẽ không được tính.
+- Một người bị crawl thành nhiều entity ("MC Trấn Thành", "Trấn Thành (MC)", "Cặp đôi MC Trấn Thành - Hari Won") được gom lại theo tên sau khi bỏ chức danh và phần trong ngoặc, giữ dấu thanh. Hai người khác nhau trùng đúng tên có dấu vẫn bị gom chung; khi gõ không dấu mà tên trùng nhiều người khác nhau (Trấn Thành và Trần Thành), hệ thống đưa lựa chọn để người dùng chọn.
+- Tên viết hoa không khớp ai trong kho ("Jack Ma", "Taylor Swift", "Thành Văn Lương") trả `no_seed_entity` thay vì tìm theo hình, vì tìm theo hình chỉ ra người lạ trông giống. Quy tắc dựa vào chữ hoa và họ phổ biến: câu gõ toàn chữ thường hoặc toàn chữ hoa không được kiểm tra này, và một tên địa danh không có trong kho mở đầu bằng họ (ví dụ "Trường Sa") cũng bị coi là tên người lạ.
+- Gõ sai được sửa khi lệch một chữ cái (hai chữ với tên dài từ 12 ký tự) và đúng số từ; tên một từ ("Rhymastic", "Kimmese") không được sửa để tránh khớp nhầm từ thường.
+- Kho gần như toàn ảnh người, nên câu tả cảnh ("bãi biển Nha Trang", "hồ bơi ở Phú Quốc") chỉ có vài ảnh khớp: ảnh người chụp ở bãi biển, ảnh có mô tả nhắc tới Nha Trang. Phần khớp một phần của mô tả không tính các cặp từ trùng tên người khi bỏ dấu ("công viên" và Văn Công Viễn, "Phú Quốc" và Phạm Phú Quốc), và địa danh sau "ở/tại" chỉ góp vào xếp hạng chứ không đủ để một ảnh được chọn. Câu cảnh chưa có đáp án tự động, được chấm bằng mắt trong mục "Manual cases" của báo cáo eval.
+- Sửa lỗi gõ phải giữ đúng dấu người dùng đã gõ: "áo dài" có dấu không bị sửa thành "Bảo Đại", "đang hát" không thành "Đặng Tất". Câu gõ toàn chữ thường không dấu chỉ được sửa khi cụm đó không xuất hiện trong mô tả ảnh nào ("ao dai" có trong 463 mô tả nên giữ nguyên).
+- Tên đầy đủ không có trong kho nhưng mở đầu giống tên người khác ("Nguyễn Chí Thanh" so với Nguyễn Chí Thiện, Nguyễn Chí Dũng; "Bùi Hải Linh" so với Hải Linh) trả `no_seed_entity`, kể cả khi gõ thường hoặc không dấu: phần tên khớp được đứng cạnh một chữ thường làm tên riêng (chữ cuối của ít nhất 3 tên người trong kho) hoặc một họ. Không áp dụng khi chữ đứng sau là mô tả, quan hệ hay danh xưng ("Sơn Tùng đang hát"), hoặc khi chữ đầu đọc được là quan hệ ("vợ thành viên..." trùng "Võ Thanh..." khi bỏ dấu). Gõ sai không bao giờ được sửa thành một tên rút gọn (chỉ vài chữ đầu của tên).
