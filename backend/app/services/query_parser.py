@@ -6,9 +6,9 @@ Parsing works on diacritic-folded tokens but keeps the original words for the en
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
-from ..textnorm import cased_tokens, fold, norm
+from ..textnorm import cased_tokens, fold, norm, tone_style
 from .entity_linker import _NAME_TAIL, AliasIndex, EntityRef, Span, edit_distance
 
 MAX_INTENTS = 3
@@ -210,19 +210,39 @@ def _starts_phrase(folded: list[str], i: int) -> bool:
 
 
 def _typo_keeps_accents(words: list[str], candidates) -> bool:
-    """A typo changes a letter, not every accent: "áo dài" is one letter from "ao dai" -> "Bảo Đại" and
+    """A typo changes a letter, not an accent: "áo dài" is one letter from "ao dai" -> "Bảo Đại" and
     "đang hát" from "Đặng Tất" once accents are dropped, but typed with accents they are far from both.
     Text typed without accents is compared without them, as the fuzzy match already did."""
-    typed = " ".join(words)
+    typed = tone_style(" ".join(words))
     if typed == fold(typed):
         return True
     for ref in candidates:
-        marked = norm(_NAME_TAIL.split(ref.name, 1)[0]).split()
+        marked = tone_style(norm(_NAME_TAIL.split(ref.name, 1)[0])).split()
         n = len(words)
         windows = [" ".join(marked[i:i + n]) for i in range(max(1, len(marked) - n + 1))]
-        if any(edit_distance(typed, w) <= edit_distance(fold(typed), fold(w)) + 1 for w in windows):
+        # compare with the part of the name the typo matched ("Vân Đông" in "Nhạc sĩ Vân Đông"), not any part
+        plain = {w: edit_distance(fold(typed), fold(w)) for w in windows}
+        best = min(plain.values())
+        # a wrong or missing letter with the accents kept ("Trn" for "Trần"); a changed accent makes another
+        # name: "Xuân Bắc" is not "Xuân Ba"
+        if any(d == best and edit_distance(typed, w) <= d for w, d in plain.items()):
             return True
     return False
+
+
+def _accents_agree(words: list[str], ref: EntityRef) -> bool:
+    """Whether a name typed with accents is this person's name, not another that folds to the same letters:
+    "Vân Dung" is not "Văn Dung", "Phạm Minh Hàng" is not "Phạm Minh Hằng". A word typed without accents
+    matches any accents ("Van Dung" may be either), and a name only reachable through a nickname alias
+    cannot be compared, so it is kept."""
+    words = tone_style(" ".join(words)).split()  # "Hoà" is "Hòa"
+    marked = tone_style(norm(_NAME_TAIL.split(ref.name, 1)[0])).split()
+    n = len(words)
+    windows = [marked[i:i + n] for i in range(len(marked) - n + 1)]
+    aligned = [w for w in windows if [fold(x) for x in w] == [fold(x) for x in words]]
+    if not aligned:
+        return True
+    return any(all(t == fold(t) or t == m for t, m in zip(words, w)) for w in aligned)
 
 
 class RuleParser:
@@ -244,10 +264,18 @@ class RuleParser:
         if len(cased) != len(folded) or text.isupper():
             cased = []  # case tells names apart only in mixed-case text
         spans = index.find_spans(masked)
+        spans = self._keep_typed_accents(spans, orig, folded, index)
         if self._fuzzy and (not spans or self._name_continues(spans, folded, cased)):
             lowercase = not any(w[:1].isupper() for w in cased_tokens(text))
-            typos = [t for t in self._fuzzy(masked, lowercase=lowercase)
-                     if _typo_keeps_accents(orig[t.start:t.end], t.candidates)]
+
+            def accept(start, end, alias, refs):
+                words = orig[start:end]
+                if _typo_keeps_accents(words, refs):
+                    return refs
+                # "Nguyn Huy Dũng" is Nguyễn Huy Dũng (derived from "Nguyễn Huy Dũng (Thứ trưởng)"), not Dung
+                return [r for r in index.shadowed.get(alias, []) if _typo_keeps_accents(words, [r])]
+
+            typos = self._fuzzy(masked, lowercase=lowercase, accept=accept)
             spans = self._extend_by_typo(spans, typos)
         spans, cut = self._cut_short_names(spans, folded, index)
         unknown_names = self._unknown_names(spans, folded, cased) + cut + self._lone_name_after_cua(spans, folded, cased)
@@ -362,6 +390,24 @@ class RuleParser:
         return spans
 
     @staticmethod
+    def _keep_typed_accents(spans: list[Span], orig: list[str], folded: list[str], index: AliasIndex) -> list[Span]:
+        """Drop candidates whose accents differ from the ones typed, and bring in a person whose name only a
+        derived alias spells that way ("Tuấn Hùng" is "Tuấn Hùng (Bức Tường)", not Tuấn Hưng). When none is
+        left, the person typed is not in the data, but someone whose name differs only in accents is: offer
+        them instead of searching."""
+        kept = []
+        for s in spans:
+            words = orig[s.start:s.end]
+            if all(w == fold(w) for w in words):
+                kept.append(s)
+                continue
+            refs = [c for c in s.candidates if _accents_agree(words, c)]
+            if not refs:
+                refs = [c for c in index.shadowed.get(" ".join(folded[s.start:s.end]), []) if _accents_agree(words, c)]
+            kept.append(replace(s, candidates=refs or s.candidates, confirm=not refs))
+        return kept
+
+    @staticmethod
     def _cut_short_names(spans: list[Span], folded: list[str], index: AliasIndex):
         """"Nguyễn Chí Thanh" is nobody in the data, but its first words "Nguyễn Chí" open the names of
         Nguyễn Chí Thiện and Nguyễn Chí Dũng ("Trần Thanh Phong" likewise starts with "Trấn Thành" once accents
@@ -457,7 +503,7 @@ class RuleParser:
 
     def _parse_segment(self, orig, folded, s_start, s_end, seg_spans) -> Intent | None:
         o, f = orig[s_start:s_end], folded[s_start:s_end]
-        spans = [Span(s.start - s_start, s.end - s_start, s.text, s.candidates, s.fuzzy, s.score)
+        spans = [replace(s, start=s.start - s_start, end=s.end - s_start)
                  for s in seg_spans]
         # leading noise ("ảnh", "hình ảnh"...) only if it is not the start of an entity
         if not spans or spans[0].start > 0:
@@ -465,7 +511,7 @@ class RuleParser:
             shift = len(f) - len(f2)
             if shift and (not spans or spans[0].start >= shift):
                 o, f = o2, f2
-                spans = [Span(s.start - shift, s.end - shift, s.text, s.candidates, s.fuzzy, s.score)
+                spans = [replace(s, start=s.start - shift, end=s.end - shift)
                          for s in spans]
         if not f:
             return None

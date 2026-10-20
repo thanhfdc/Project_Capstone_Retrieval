@@ -335,6 +335,47 @@ def test_typo_must_keep_the_accents_it_was_typed_with():
     assert _typo_keeps_accents(["ao", "dai"], bao_dai)            # typed without accents: no evidence either way
     assert _typo_keeps_accents(["trn", "thị", "thùy", "dung"],
                                [EntityRef("e3", "Trần Thị Thùy Dung", "person", "female")])
+    # "Xuân Bắc" (not in the data) is another person than "Xuân Ba", not a typo of it
+    assert not _typo_keeps_accents(["xuân", "bắc"], [EntityRef("e4", "Xuân Ba", "person", "male")])
+    # only the matched part of a longer name counts: "nhạc sĩ" says nothing about "vân dung"
+    assert not _typo_keeps_accents(["vân", "dung"], [EntityRef("e6", "Nhạc sĩ Vân Đông", "person", "male")])
+
+
+def test_name_typed_with_other_accents_is_another_person():
+    names = ["Nhạc sĩ Văn Dung", "Xuân Ba", "Phạm Minh Hằng", "Mỹ Tâm"]
+    rows = [{"alias_fold": fold(n.replace("Nhạc sĩ ", "")), "entity_id": f"e{i}", "canonical_name": n,
+             "entity_type": "person", "gender": None} for i, n in enumerate(names)]
+    idx = AliasIndex.from_rows(rows)
+    parser = RuleParser(lambda: idx)
+    # someone whose name differs only in accents is offered for confirmation, never searched directly
+    for q, name in (("Vân Dung", "Nhạc sĩ Văn Dung"), ("Phạm Minh Hàng", "Phạm Minh Hằng"),
+                    ("ảnh Vân Dung đang cười", "Nhạc sĩ Văn Dung")):
+        it = parser.parse(q).intents[0]
+        assert not it.seeds and [c.name for s in it.ambiguous for c in s.candidates] == [name], q
+        assert all(s.confirm for s in it.ambiguous), q
+    # the same accents, or none typed, still find the person
+    for q, name in (("Văn Dung", "Nhạc sĩ Văn Dung"), ("van dung", "Nhạc sĩ Văn Dung"), ("Mỹ Tâm", "Mỹ Tâm"),
+                    ("my tam", "Mỹ Tâm")):
+        assert [s.name for s in parser.parse(q).intents[0].seeds] == [name], q
+
+
+def test_accents_pick_the_person_a_shared_alias_hides():
+    # "tuan hung" is Tuấn Hưng's alias; Tuấn Hùng is only reachable through "Tuấn Hùng (Bức Tường)"
+    names = [("Tuấn Hưng", "tuan hung"), ("Tuấn Hùng (Bức Tường)", "tuan hung buc tuong"),
+             ("Nguyễn Hòa Bình", "nguyen hoa binh")]
+    rows = [{"alias_fold": a, "entity_id": f"e{i}", "canonical_name": n, "entity_type": "person", "gender": None}
+            for i, (n, a) in enumerate(names)]
+    parser = RuleParser(lambda: AliasIndex.from_rows(rows))
+    for q, name in (("Tuấn Hùng", "Tuấn Hùng (Bức Tường)"), ("Tuấn Hưng", "Tuấn Hưng"), ("tuan hung", "Tuấn Hưng"),
+                    ("Nguyễn Hoà Bình", "Nguyễn Hòa Bình")):  # "Hoà" and "Hòa" are one spelling in two styles
+        assert [s.name for s in parser.parse(q).intents[0].seeds] == [name], q
+
+
+def test_tone_mark_placement_styles_are_one_spelling():
+    from app.textnorm import tone_style
+    assert tone_style("hoà bình thuỷ khoẻ uỷ") == "hòa bình thủy khỏe ủy"
+    for word in ("quý", "hoàng", "toán", "thuế", "nguyễn", "hoa"):
+        assert tone_style(word) == word
 
 
 def test_description_pieces_for_partial_caption_match():

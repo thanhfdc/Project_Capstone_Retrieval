@@ -159,6 +159,13 @@ def test_typo_is_corrected_but_a_different_name_is_not(client):
     assert other["status"] == "no_seed_entity"  # nor a text match: "bác hồ" must not find "Hồ Bắc"
 
 
+def test_cached_answer_is_not_reused_for_a_name_with_other_accents(client):
+    assert search(client, "ảnh Mỹ Tâm")["status"] == "ok"  # now in the result cache
+    other = search(client, "ảnh Mỹ Tầm")  # same letters, another person: Mỹ Tầm is not in the data
+    assert not other["metrics"].get("cache_hit") and not other["items"]
+    assert other["status"] in ("needs_clarification", "no_seed_entity")
+
+
 def test_sibling_stated_and_through_a_shared_parent(client):
     r = search(client, "em trai của Hà Anh Tuấn")  # stated sibling relation
     assert r["status"] == "ok" and all("Sơn Tùng M-TP" in n for n in names(r))

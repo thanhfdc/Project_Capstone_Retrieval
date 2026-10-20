@@ -53,7 +53,7 @@ Mục này đối chiếu bản thiết kế bên dưới với code đã chạy
 | Throughput (Locust qua Nginx, 20/10 07:52) | 20 người dùng: 18,8 RPS, p99 120 ms, 0 lỗi trên 1.122 request; RPS tăng tuyến tính 1,0 → 4,8 → 9,4 → 18,8, chưa bão hòa | `reports/load_report.md` |
 | Scale (20/10 08:46, 32 người không nghỉ, Locust trong mạng Docker) | 1 worker: 292 RPS bão hòa, p99 460 ms, 0 lỗi trên 17.382 request; 4 worker chỉ +24% RPS nhưng RAM 1,9 → 6,4 GB, p99 910 ms nên giữ 1 worker | `reports/scale_report_docker.md`, `docs/PERFORMANCE.md` mục 3b |
 | Gọi LLM | 0 lần trên toàn bộ test: mọi câu đi qua bộ luật | cột `LLM calls` trong báo cáo |
-| Unit + integration test | 54 test, chạy trong CI với Postgres pgvector thật | `backend/tests`, `.github/workflows/ci.yml` |
+| Unit + integration test | 58 test, chạy trong CI với Postgres pgvector thật | `backend/tests`, `.github/workflows/ci.yml` |
 
 Chất lượng lần chạy 20/10 07:47 trên máy demo, 3.176 câu (precision@10 = tỷ lệ ảnh trong top 10 có nhãn đúng người; status = trả đúng trạng thái mong đợi):
 
@@ -106,6 +106,7 @@ So với lần chạy 19/10 trước khi sửa: gõ sai tên 44% → 84%, "chụ
 | Quan hệ của một tên một chữ không có trong kho ("con trai của Bear", "bạn thân của Trang") trả "không nhận ra tên" | Trước đó cả câu thành mô tả và trả ảnh các bé trai không liên quan (eval 20/10, nhóm negative/missing_relation) |
 | Scale trên một máy bằng nhiều process API: `API_WORKERS` (uvicorn `WEB_CONCURRENCY`), `DB_POOL_MAX` mỗi process, migration có advisory lock; `eval/run_scale.py` đo 1/2/4 worker và ghi `reports/scale_report.md` | Một process Python bị GIL và một khe encode giới hạn; load test 20/10 cho thấy RPS còn tăng tuyến tính nên chưa biết trần. Làm theo mục 19.3 (Mức 1–2), không cần Kubernetes (19.6) |
 | Tên đầy đủ không có trong kho nhưng mở đầu giống tên người khác ("Nguyễn Chí Thanh", "Bùi Hải Linh") trả "không nhận ra tên", kể cả gõ thường hoặc không dấu; eval thêm nhóm `partial_name` | "Nguyễn Chí Thanh" từng gợi ý Nguyễn Chí Thiện, Nguyễn Chí Dũng, tìm chữ "thanh" như mô tả, và cùng lúc báo không nhận ra tên |
+| Tên gõ có dấu chỉ khớp người đúng dấu đó ("Xuân Bắc" không còn ra Xuân Ba); không ai đúng dấu thì hỏi lại "Có phải bạn muốn tìm: …" thay vì trả ảnh; "Hoà"/"Hòa" coi là một; dấu đã gõ chọn đúng người khi hai người trùng tên không dấu, kể cả khi gõ sai một chữ; cache kết quả phân biệt dấu | Khi thử "Xuân Bắc" (không có trong kho), hệ thống trả ảnh của Xuân Ba; eval 20/10 cho thấy thêm 39 câu từng ra nhầm người ("Tuấn Hùng" ra Tuấn Hưng, "Hồ Văn Mời" ra Hồ Văn Lợi) nay ra đúng người |
 
 ### 0.4 Cách chạy hiện tại
 

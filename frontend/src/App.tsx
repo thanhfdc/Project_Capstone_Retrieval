@@ -21,6 +21,7 @@ const STATUS_TEXT: Record<string, string> = {
   needs_clarification: "Tên này khớp với nhiều người, hãy chọn một.",
 };
 const REFINE_TEXT = "Tên này khớp với nhiều người, đang hiện ảnh của tất cả. Chỉ xem một người:";
+const SPELLING_TEXT = "Không có ai đúng tên này (kể cả dấu) trong kho. Có phải bạn muốn tìm:";
 
 export default function App() {
   const [query, setQuery] = useState("");
@@ -180,7 +181,13 @@ function Results({
 
       {result.clarification_options.length > 0 && (
         <div className={result.status === "needs_clarification" ? "notice" : "refine"}>
-          <p>{result.status === "needs_clarification" ? STATUS_TEXT.needs_clarification : REFINE_TEXT}</p>
+          <p>
+            {result.status !== "needs_clarification"
+              ? REFINE_TEXT
+              : result.clarification_options.every((o) => o.kind === "spelling")
+                ? SPELLING_TEXT
+                : STATUS_TEXT.needs_clarification}
+          </p>
           {result.clarification_options.map((o) => (
             <div key={o.mention} className="example-row">
               <span className="muted">“{o.mention}”</span>

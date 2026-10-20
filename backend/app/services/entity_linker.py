@@ -44,10 +44,13 @@ class Span:
     candidates: list[EntityRef]
     fuzzy: bool = False
     score: float = 1.0
+    # typed with other accents than every candidate ("Vân Dung" for Văn Dung): ask before searching
+    confirm: bool = False
+    alias: str = ""  # the stored alias a typo was matched to
 
     @property
     def ambiguous(self) -> bool:
-        return len(self.candidates) > 1
+        return len(self.candidates) > 1 or self.confirm
 
 
 @dataclass
@@ -59,6 +62,9 @@ class AliasIndex:
     name_pairs: set[str] = field(default_factory=set)  # adjacent words inside people's names: "cong vien"
     weak: set[str] = field(default_factory=set)  # aliases made of a name's first words: "nguyen chi"
     given_names: set[str] = field(default_factory=set)  # words that end several people's names: "thanh"
+    # derived names hidden by another person's alias with the same letters: "tuan hung" is Tuấn Hưng, but
+    # "Tuấn Hùng (Bức Tường)" waits here for a query that types his accents
+    shadowed: dict[str, list[EntityRef]] = field(default_factory=dict)
 
     @classmethod
     def from_rows(cls, rows) -> AliasIndex:
@@ -95,7 +101,9 @@ class AliasIndex:
             add(idx.by_alias, " ".join(words), ref)
             idx.max_len = max(idx.max_len, len(words))
         for key, bucket in derived.items():
-            idx.by_alias.setdefault(key, bucket)
+            hidden = [ref for ref in bucket if ref not in idx.by_alias.setdefault(key, bucket)]
+            if hidden:
+                idx.shadowed[key] = hidden
             idx.max_len = max(idx.max_len, len(key.split()))
         for key, bucket in weak.items():
             if key not in idx.by_alias and len(bucket) <= MAX_WEAK_FANOUT:
@@ -212,13 +220,17 @@ class EntityLinker:
             self.index = index
         return len(index.by_alias)
 
-    def fuzzy(self, folded_tokens: list[str], threshold: float = 0.45, lowercase: bool = False) -> list[Span]:
+    def fuzzy(self, folded_tokens: list[str], threshold: float = 0.45, lowercase: bool = False,
+              accept=None) -> list[Span]:
         """Typo fallback over 2..4-token windows; returns at most one best span.
 
         Trigram similarity ignores word order and rewards shared words, so "tong thi phong" looks like
         "pham thi hong" and "bac ho" like "ho bac". A candidate counts as a typo only when it has the same
         number of words and is a character or two away, which is also what keeps the low trigram
-        threshold safe: "trn xuan bach" is only 0.5 similar to "tran xuan bach"."""
+        threshold safe: "trn xuan bach" is only 0.5 similar to "tran xuan bach".
+
+        `accept(start, end, alias, refs)` returns the refs the typed text may mean (or none): equally close
+        aliases are then tried in order, so "Hồ Văn Mời" reaches "Hồ Văn Mười" past "Hồ Văn Lợi"."""
         grams = []
         for n in range(2, 5):
             for i in range(0, len(folded_tokens) - n + 1):
@@ -236,7 +248,7 @@ class EntityLinker:
             """, ([g[2] for g in grams], threshold)).fetchall()
         found = [(grams[r["ord"] - 1], r["alias_fold"], float(r["score"])) for r in rows]
         found += [(g, alias, 0.0) for g in grams for alias in self.index.one_letter_off(g[2])]
-        best = None
+        ranked = {}
         for (start, end, text), alias, score in found:
             if len(alias.split()) != end - start or not self.index.by_alias.get(alias) or alias in self.index.weak:
                 continue  # a misspelt first-words-only alias ("pham dinh khanh" for "pham dinh thanh") is too weak
@@ -244,18 +256,29 @@ class EntityLinker:
             if dist > (2 if len(alias) >= 12 else 1):
                 continue
             rank = (end - start, -dist, score)
-            if best is None or rank > best[0]:
-                best = (rank, start, end, text, alias, score)
-        if best is None:
+            if rank > ranked.get((start, end, text, alias), (0, 0, -1.0)):
+                ranked[(start, end, text, alias)] = rank
+        best = None
+        for (start, end, text, alias), rank in sorted(ranked.items(), key=lambda kv: kv[1], reverse=True):
+            if best is not None and rank[:2] != best[0][:2]:
+                break  # only aliases as close as the best one
+            refs = list(self.index.by_alias[alias])
+            refs = accept(start, end, alias, refs) if accept else refs
+            if refs:
+                best = (rank, start, end, text, alias, refs)
+                break
+            best = best or (rank, start, end, text, alias, [])
+        if best is None or not best[5]:
             return []
-        _, start, end, text, alias, score = best
+        rank, start, end, text, alias, refs = best
+        score = rank[2]
         if lowercase:  # captions hold names too, so only text not written as a name is checked
             with self.pool.connection() as conn:
                 # words common as typed ("ao dai" in 463 captions) are not a misspelt "Bảo Đại"
                 if conn.execute("SELECT 1 FROM images WHERE search_tsv @@ phraseto_tsquery('simple', %s) LIMIT 1",
                                 (text,)).fetchone():
                     return []
-        return [Span(start, end, text, list(self.index.by_alias[alias]), fuzzy=True, score=score)]
+        return [Span(start, end, text, refs, fuzzy=True, score=score, alias=alias)]
 
     def suggest(self, q: str, limit: int = 8) -> list[EntityRef]:
         key = fold(q)

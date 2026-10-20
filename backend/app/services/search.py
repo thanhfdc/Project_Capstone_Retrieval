@@ -44,7 +44,8 @@ class SearchService:
     def search(self, query: str, top_k: int, selected_entity_ids: list[str] | None = None,
                use_cache: bool = True) -> dict:
         started = time.perf_counter()
-        key = (fold(query), top_k, tuple(sorted(selected_entity_ids or [])), self.snapshot)
+        # accents and capitals change who a name is ("Xuân Bắc" is not "Xuân Ba"), so the key keeps them
+        key = (" ".join(query.split()), top_k, tuple(sorted(selected_entity_ids or [])), self.snapshot)
         if use_cache and self.s.result_cache_enabled:
             with self._cache_lock:
                 hit = self._cache.get(key)
@@ -141,12 +142,15 @@ class SearchService:
             unresolved = []
             for span in it.ambiguous:
                 chosen = [c for c in span.candidates if c.entity_id in selected]
-                option = {"mention": span.text, "candidates": [
+                option = {"mention": span.text, "kind": "spelling" if span.confirm else "same_name", "candidates": [
                     {"entity_id": c.entity_id, "name": c.name, "entity_type": c.entity_type}
                     for c in span.candidates]}
                 one_person = len({person_key(c.name) for c in span.candidates}) == 1
                 if chosen:
                     it.seeds.extend(chosen)
+                elif span.confirm:  # "Vân Dung" is not Văn Dung: show nobody's photos until the user says so
+                    unresolved.append(span)
+                    blocking.append(option)
                 elif one_person:  # duplicates of one person ("Mỹ Tâm", "Mỹ Tâm (queen Vpop)"): search them all
                     it.seeds.extend(span.candidates)
                 elif together:

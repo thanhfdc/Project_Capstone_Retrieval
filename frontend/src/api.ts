@@ -44,7 +44,7 @@ export interface SearchResponse {
   };
   groups: Group[];
   items: Record<string, Item>;
-  clarification_options: { mention: string; candidates: EntityRef[] }[];
+  clarification_options: { mention: string; kind?: "same_name" | "spelling"; candidates: EntityRef[] }[];
   warnings: string[];
   metrics: Record<string, number | boolean>;
 }
