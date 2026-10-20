@@ -166,6 +166,16 @@ def test_cached_answer_is_not_reused_for_a_name_with_other_accents(client):
     assert other["status"] in ("needs_clarification", "no_seed_entity")
 
 
+def test_name_without_surname_asks_before_searching(client):
+    for q in ("Nhật Vượng", "ảnh nhật vượng"):  # only Phạm Nhật Vượng is in the data
+        r = search(client, q)
+        assert r["status"] == "needs_clarification" and not r["items"], q
+        [option] = r["clarification_options"]
+        assert option["kind"] == "spelling" and [c["name"] for c in option["candidates"]] == ["Phạm Nhật Vượng"]
+    picked = search(client, "Nhật Vượng", selected_entity_ids=[option["candidates"][0]["entity_id"]])
+    assert picked["status"] == "ok" and all("Phạm Nhật Vượng" in n for n in names(picked))
+
+
 def test_sibling_stated_and_through_a_shared_parent(client):
     r = search(client, "em trai của Hà Anh Tuấn")  # stated sibling relation
     assert r["status"] == "ok" and all("Sơn Tùng M-TP" in n for n in names(r))

@@ -279,6 +279,7 @@ class RuleParser:
             spans = self._extend_by_typo(spans, typos)
         spans, cut = self._cut_short_names(spans, folded, index)
         unknown_names = self._unknown_names(spans, folded, cased) + cut + self._lone_name_after_cua(spans, folded, cased)
+        spans, unknown_names = self._name_endings(spans, unknown_names, orig, masked, index)
         plan = QueryPlan(query=query, intents=[])
 
         # 1. Shared location suffix: "... ở/tại <place or free text>"
@@ -406,6 +407,24 @@ class RuleParser:
                 refs = [c for c in index.shadowed.get(" ".join(folded[s.start:s.end]), []) if _accents_agree(words, c)]
             kept.append(replace(s, candidates=refs or s.candidates, confirm=not refs))
         return kept
+
+    @staticmethod
+    def _name_endings(spans: list[Span], unknown_names: list[tuple[int, int]], orig: list[str], masked: list[str],
+                      index: AliasIndex) -> tuple[list[Span], list[tuple[int, int]]]:
+        """"Quang Thắng" is nobody in the data, but it ends the name of Tạ Quang Thắng, and people are often
+        called without their surname. Ask whether that person was meant rather than report an unknown name
+        or, typed in lowercase as the whole query, search "quang thắng" as a description."""
+        runs = list(unknown_names)
+        if not spans and not runs:
+            a = next((k for k, w in enumerate(masked) if w != "#"), len(masked))
+            if 2 <= len(masked) - a <= 4:
+                runs = [(a, len(masked))]  # the query is only the name ("ảnh quang thắng")
+        for a, b in runs:
+            refs = [r for r in index.endings.get(" ".join(masked[a:b]), []) if _accents_agree(orig[a:b], r)]
+            if refs:
+                spans = sorted(spans + [Span(a, b, " ".join(orig[a:b]), refs, confirm=True)], key=lambda s: s.start)
+                unknown_names = [r for r in unknown_names if r != (a, b)]
+        return spans, unknown_names
 
     @staticmethod
     def _cut_short_names(spans: list[Span], folded: list[str], index: AliasIndex):

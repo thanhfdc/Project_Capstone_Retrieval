@@ -23,7 +23,7 @@ Những gì nhãn không nói được (ví dụ "đang biểu diễn", "bãi bi
 
 Quy tắc chống "học thuộc đề": tên trùng nhiều người bị loại khỏi ca dương tính; câu hỏi sinh bằng template khác với template trong bộ luật (có danh xưng, không dấu, gõ sai); không có bảng câu hỏi → đáp án nào trong code.
 
-Unit test (`backend/tests`, 58 test: 37 hàm unit test và 17 hàm integration test, vài hàm chạy với nhiều tham số) kiểm từng quy tắc của code trên dữ liệu mẫu nhỏ (31 ảnh), chạy trong vài giây ở CI; mỗi test thường gói nhiều câu hỏi (ví dụ một test kiểm 9 câu tên không có trong data). Đây là lưới an toàn khi sửa code, không phải thước đo chất lượng. Eval ở đây đo chất lượng trên toàn bộ data thật; `--per-type` quyết định quy mô: 40 để thử nhanh, 1500 cho báo cáo (khoảng 3.000 câu, vài phút).
+Unit test (`backend/tests`, 60 test: 38 hàm unit test và 18 hàm integration test, vài hàm chạy với nhiều tham số) kiểm từng quy tắc của code trên dữ liệu mẫu nhỏ (31 ảnh), chạy trong vài giây ở CI; mỗi test thường gói nhiều câu hỏi (ví dụ một test kiểm 9 câu tên không có trong data). Đây là lưới an toàn khi sửa code, không phải thước đo chất lượng. Eval ở đây đo chất lượng trên toàn bộ data thật; `--per-type` quyết định quy mô: 40 để thử nhanh, 1500 cho báo cáo (khoảng 3.000 câu, vài phút).
 
 ```bash
 DATABASE_URL=postgresql://capstone:capstone@localhost:5433/capstone \

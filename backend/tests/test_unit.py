@@ -371,6 +371,21 @@ def test_accents_pick_the_person_a_shared_alias_hides():
         assert [s.name for s in parser.parse(q).intents[0].seeds] == [name], q
 
 
+def test_name_without_its_surname_asks_for_the_person():
+    names = ["Tạ Quang Thắng", "Tạ Quang Thắng (rock/pop-rock)", "Mỹ Tâm"]
+    rows = [{"alias_fold": fold(n.split(" (")[0]), "entity_id": f"e{i}", "canonical_name": n,
+             "entity_type": "person", "gender": None} for i, n in enumerate(names)]
+    parser = RuleParser(lambda: AliasIndex.from_rows(rows))
+    # typed capitalised, lowercase, without accents or after "ảnh": ask, never search it as a description
+    for q in ("Quang Thắng", "quang thắng", "quang thang", "ảnh Quang Thắng", "Quang Thắng đang hát"):
+        it = parser.parse(q).intents[0]
+        assert not it.seeds and not it.unknown_name, q
+        assert [(s.confirm, [c.name for c in s.candidates]) for s in it.ambiguous] == [(True, names[:2])], q
+    # other accents are another person; a name ending nobody's name is still unknown
+    assert parser.parse("Quang Thẳng").intents[0].unknown_name == "quang thẳng"
+    assert parser.parse("Jack Ma").intents[0].unknown_name == "jack ma"
+
+
 def test_tone_mark_placement_styles_are_one_spelling():
     from app.textnorm import tone_style
     assert tone_style("hoà bình thuỷ khoẻ uỷ") == "hòa bình thủy khỏe ủy"

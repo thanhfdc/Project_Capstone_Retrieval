@@ -21,7 +21,7 @@ const STATUS_TEXT: Record<string, string> = {
   needs_clarification: "Tên này khớp với nhiều người, hãy chọn một.",
 };
 const REFINE_TEXT = "Tên này khớp với nhiều người, đang hiện ảnh của tất cả. Chỉ xem một người:";
-const SPELLING_TEXT = "Không có ai đúng tên này (kể cả dấu) trong kho. Có phải bạn muốn tìm:";
+const SPELLING_TEXT = "Không có ai đúng tên này trong kho. Có phải bạn muốn tìm:";
 
 export default function App() {
   const [query, setQuery] = useState("");

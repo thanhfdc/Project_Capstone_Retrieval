@@ -65,6 +65,8 @@ class AliasIndex:
     # derived names hidden by another person's alias with the same letters: "tuan hung" is Tuấn Hưng, but
     # "Tuấn Hùng (Bức Tường)" waits here for a query that types his accents
     shadowed: dict[str, list[EntityRef]] = field(default_factory=dict)
+    # the last words of people's names: "quang thang" -> Tạ Quang Thắng, for a name typed without its surname
+    endings: dict[str, list[EntityRef]] = field(default_factory=dict)
 
     @classmethod
     def from_rows(cls, rows) -> AliasIndex:
@@ -105,6 +107,14 @@ class AliasIndex:
             if hidden:
                 idx.shadowed[key] = hidden
             idx.max_len = max(idx.max_len, len(key.split()))
+        endings: dict[str, list[EntityRef]] = {}
+        for ref, _ in refs:
+            core = _strip_title(heads[ref.entity_id])
+            if ref.entity_type == "person" and len(core) <= 4:
+                for n in range(2, len(core)):
+                    add(endings, " ".join(core[-n:]), ref)
+        idx.endings = {k: b for k, b in endings.items()
+                       if k not in idx.by_alias and len({person_key(r.name) for r in b}) <= MAX_WEAK_FANOUT}
         for key, bucket in weak.items():
             if key not in idx.by_alias and len(bucket) <= MAX_WEAK_FANOUT:
                 idx.by_alias[key] = bucket
@@ -234,7 +244,8 @@ class EntityLinker:
         grams = []
         for n in range(2, 5):
             for i in range(0, len(folded_tokens) - n + 1):
-                grams.append((i, i + n, " ".join(folded_tokens[i:i + n])))
+                if "#" not in folded_tokens[i:i + n]:  # a masked "ảnh" is no letter of a name: "# quang thang"
+                    grams.append((i, i + n, " ".join(folded_tokens[i:i + n])))
         if not grams:
             return []
         with self.pool.connection() as conn:
