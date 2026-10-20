@@ -34,6 +34,10 @@ services:
       <<: *db-env
       ENCODER_BACKEND: ${ENCODER_BACKEND:-onnx}
       ENCODER_THREADS: ${ENCODER_THREADS:-4}
+      # Scale on one host: API_WORKERS uvicorn processes, each with its own model copy, encoder slot and DB pool.
+      # Keep API_WORKERS x ENCODER_THREADS <= CPU cores and API_WORKERS x DB_POOL_MAX < 50 (max_connections).
+      WEB_CONCURRENCY: ${API_WORKERS:-1}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-claude-opus-5-5}
     volumes:

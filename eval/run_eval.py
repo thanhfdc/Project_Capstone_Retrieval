@@ -61,17 +61,24 @@ def main() -> int:
         post(args.api, c["query"], args.top_k)
 
     rows = []
-    for c in cases:
+    for n, c in enumerate(cases, start=1):
+        if n % 250 == 0:
+            print(f"{n}/{len(cases)} cases", file=sys.stderr, flush=True)
         try:
             r, ms = post(args.api, c["query"], args.top_k)
         except Exception as exc:  # noqa: BLE001
             rows.append({**c, "error": str(exc), "client_ms": None})
             continue
         got_status = "ok" if r["status"] in ("ok", "partial") else r["status"]
+        if got_status == "no_seed_entity":  # "no one by that name": also nothing returned, with the reason why
+            got_status = "no_results"
         row = {**c, "status": r["status"], "status_ok": got_status == c.get("expected_status", "ok"),
                "client_ms": round(ms, 1), "server_ms": r["metrics"]["server_ms"], "parser": r["interpretation"]["parser"],
                "llm_calls": r["metrics"]["llm_calls"], "tokens": r["metrics"]["input_tokens"] + r["metrics"]["output_tokens"],
                "detected_type": r["query_type"], "top": []}
+        returned = {i for g in r["groups"] for i in g["image_ids"][: args.top_k]}
+        if c.get("forbid") and links:  # e.g. "bạn thân của X" must not show X
+            row["status_ok"] = row["status_ok"] and not any(links.get(i, set()) & set(c["forbid"]) for i in returned)
         expected = c.get("expected_groups") or []
         if expected and links:
             precisions, covered = [], 0
@@ -83,7 +90,9 @@ def main() -> int:
                     ids = g["image_ids"][: args.top_k]
                     if not ids:
                         continue
-                    if c.get("require_all"):
+                    if c.get("require_all_groups"):  # same photo: one entity of every person
+                        hits = [i for i in ids if all(links[i] & set(grp) for grp in c["require_all_groups"])]
+                    elif c.get("require_all"):
                         hits = [i for i in ids if exp_set <= links[i]]
                     else:
                         hits = [i for i in ids if links[i] & exp_set]
@@ -110,7 +119,8 @@ def main() -> int:
         summary[qt] = {
             "cases": len(rs),
             "status_accuracy": round(sum(r.get("status_ok", False) for r in rs) / len(rs), 3),
-            "type_detected_correctly": round(sum(r.get("detected_type") == qt for r in rs) / len(rs), 3),
+            "type_detected_correctly": None if qt == "robustness" else
+            round(sum(r.get("detected_type") == qt for r in rs) / len(rs), 3),
             "precision_at_k": round(statistics.mean(prec), 3) if prec else None,
             "intent_coverage": round(statistics.mean(cov), 3) if cov else None,
             "p50_ms": round(pct(lat, 50), 1), "p95_ms": round(pct(lat, 95), 1), "p99_ms": round(pct(lat, 99), 1),
@@ -140,14 +150,29 @@ def main() -> int:
         return "" if v is None else f"{v:.0%}"
 
     for qt, s in summary.items():
-        lines.append(f"| {qt} | {s['cases']} | {s['status_accuracy']:.0%} | {s['type_detected_correctly']:.0%} | "
+        lines.append(f"| {qt} | {s['cases']} | {s['status_accuracy']:.0%} | {as_pct(s['type_detected_correctly'])} | "
                      f"{as_pct(s['precision_at_k'])} | {as_pct(s['intent_coverage'])} | "
                      f"{s['p50_ms']} | {s['p95_ms']} | {s['p99_ms']} | {s['max_ms']} | {s['over_3s']} | {s['errors']} | "
                      f"{s['llm_calls']} | {s['tokens']} |")
+    lines += ["", "## By variant", "", "| Type | Variant | Cases | Status acc. | Precision@k |", "|---|---|---:|---:|---:|"]
+    by_variant = defaultdict(list)
+    for r in rows:
+        if r.get("variant") != "manual":
+            parts = str(r.get("variant", "")).split("/")
+            # one-hop questions per relation ("1_hop/sibling_of", "1_hop/sibling_of_no_gender"), else the kind
+            by_variant[(r["query_type"], "/".join(parts[:2]) if parts[0] == "1_hop" else parts[0])].append(r)
+    for (qt, v), rs in sorted(by_variant.items()):
+        prec = [r["precision_at_k"] for r in rs if "precision_at_k" in r]
+        lines.append(f"| {qt} | {v} | {len(rs)} | {sum(r.get('status_ok', False) for r in rs) / len(rs):.0%} | "
+                     f"{as_pct(round(statistics.mean(prec), 3) if prec else None)} |")
     lines += ["", "## Failed or suspicious cases", ""]
+    shown = defaultdict(int)
     for r in rows:
         bad = (not r.get("status_ok", False)) or r.get("precision_at_k", 1) < 0.5 or r.get("error")
         if bad:
+            shown[r["query_type"]] += 1
+            if shown[r["query_type"]] > 60:
+                continue  # every case is in eval_results.json
             lines.append(f"- `{r['id']}` [{r['query_type']}/{r.get('variant')}] “{r['query']}” → {r.get('status', r.get('error'))}, "
                          f"precision {r.get('precision_at_k', '-')}; top: {' / '.join(r.get('top', []))[:200]}")
     lines += ["", "## Manual cases (judge by eye)", ""]

@@ -7,9 +7,10 @@ Run through eval/run_load.py, which sweeps the number of users and writes the re
 import json
 import os
 import random
+import time
 from pathlib import Path
 
-from locust import HttpUser, between, task
+from locust import FastHttpUser, between, task
 
 CASES = [json.loads(line) for line in
          Path(os.environ.get("CASES", "eval/testcases.jsonl")).read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -17,18 +18,21 @@ BY_TYPE = {t: [c["query"] for c in CASES if c["query_type"] == t] for t in ("sin
 NOCACHE = "" if os.environ.get("CACHE") == "1" else "?nocache=true"
 
 
-class SearchUser(HttpUser):
+# FastHttpUser (geventhttpclient) needs several times less client CPU than HttpUser, so when Locust shares the
+# machine with the API the measured ceiling is the server's rather than the load generator's.
+class SearchUser(FastHttpUser):
     # THINK=0 removes the pause between requests to find the saturation throughput
     wait_time = between(0, 0) if os.environ.get("THINK") == "0" else between(0.5, 1.5)
 
     def _search(self, qtype: str):
         queries = BY_TYPE.get(qtype) or [c["query"] for c in CASES]
         q = random.choice(queries)
+        started = time.perf_counter()
         with self.client.post(f"/api/search{NOCACHE}", json={"query": q, "top_k": 20},
                               name=qtype, catch_response=True) as resp:
             if resp.status_code != 200:
                 resp.failure(f"HTTP {resp.status_code}")
-            elif resp.elapsed.total_seconds() >= 3:
+            elif time.perf_counter() - started >= 3:
                 resp.failure("slower than 3 s")
 
     @task

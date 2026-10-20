@@ -12,3 +12,5 @@ __pycache__/
 node_modules/
 frontend/dist/
 reports/*.json
+*.dump
+_tmp_onnx/

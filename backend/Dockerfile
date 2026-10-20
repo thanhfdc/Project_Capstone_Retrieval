@@ -37,7 +37,9 @@ USER app
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=6 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2).status == 200 else 1)"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log"]
+# uvicorn reads the number of worker processes from WEB_CONCURRENCY (compose sets it from API_WORKERS)
+ENV WEB_CONCURRENCY=1
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 
 FROM runtime-base AS worker
 COPY --from=deps-worker /venv /venv
