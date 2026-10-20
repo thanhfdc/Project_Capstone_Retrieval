@@ -7,7 +7,7 @@ data/relations/entities_extra.csv
 data/relations/relations.csv
     subject,predicate,object,source_url,evidence,verified
     subject/object are an entity name/alias or entity_id. predicate is one of
-    parent_of, spouse_of, founded, member_of, located_in.
+    parent_of, spouse_of, sibling_of, founded, member_of, located_in.
 Names that match zero or several entities are reported and skipped, never guessed.
 """
 import csv
@@ -19,7 +19,7 @@ from ..config import get_settings
 from ..db import connect, migrate
 from ..textnorm import fold
 
-PREDICATES = {"parent_of", "spouse_of", "founded", "member_of", "located_in"}
+PREDICATES = {"parent_of", "spouse_of", "sibling_of", "founded", "member_of", "located_in"}
 
 
 def resolve(conn, ref: str) -> tuple[uuid.UUID | None, str]:

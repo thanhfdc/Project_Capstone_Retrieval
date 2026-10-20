@@ -18,6 +18,14 @@ def norm(text: str | None) -> str:
     return _SPACES.sub(" ", text).strip()
 
 
+def cased_tokens(text: str | None) -> list[str]:
+    """The words of `norm(text)` with their case kept: "Jack Ma" -> ["Jack", "Ma"]."""
+    if not text:
+        return []
+    text = _PUNCT.sub(" ", unicodedata.normalize("NFC", text)).replace("_", " ")
+    return text.split()
+
+
 def fold(text: str | None) -> str:
     text = norm(text).replace("đ", "d")
     decomposed = unicodedata.normalize("NFD", text)

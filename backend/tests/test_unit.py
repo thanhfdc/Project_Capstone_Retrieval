@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.jobs.import_csv import canonical_rows, load_profile, resolve_columns
-from app.services.entity_linker import AliasIndex
+from app.services.entity_linker import AliasIndex, EntityRef
 from app.services.query_parser import RuleParser
 from app.services.relations import Hop
 from app.services.retriever import fuse_rrf
@@ -100,6 +100,21 @@ def test_title_is_not_a_relation(parser):
     assert [(s.predicate, s.direction, s.gender) for s in it.relation_steps] == [("parent_of", "out", "male")]
 
 
+def test_former_spouse_and_titles(parser):
+    plan = parser.parse("vợ cũ của bầu Phạm Nhật Vượng")
+    (it,) = plan.intents
+    assert [s.name for s in it.seeds] == ["Phạm Nhật Vượng"] and not it.visual_text
+    assert [(s.predicate, s.gender) for s in it.relation_steps] == [("spouse_of", "female")]
+
+
+def test_sibling_phrases(parser):
+    for q, gender in (("em gái của Phạm Nhật Vượng", "female"), ("anh trai của Phạm Nhật Vượng", "male"),
+                      ("ảnh chị gái Phạm Nhật Vượng", "female")):
+        (it,) = parser.parse(q).intents
+        assert [s.name for s in it.seeds] == ["Phạm Nhật Vượng"] and not it.visual_text, q
+        assert [(s.predicate, s.gender) for s in it.relation_steps] == [("sibling_of", gender)], q
+
+
 def test_two_hop_order(parser):
     plan = parser.parse("con trai của người sáng lập Vingroup")
     steps = plan.intents[0].relation_steps
@@ -128,6 +143,12 @@ def test_photo_word_is_not_part_of_a_name(parser, query, name):
 def test_name_starting_with_anh_still_found(parser):
     assert [s.name for s in parser.parse("ảnh Ánh Minh").intents[0].seeds] == ["Ánh Minh"]
     assert [s.name for s in parser.parse("Anh Trần Đăng Tuấn").intents[0].seeds] == ["Anh Trần Đăng Tuấn"]
+
+
+def test_edit_distance():
+    from app.services.entity_linker import edit_distance
+    assert edit_distance("tuan puong", "tuan phuong") == 1
+    assert edit_distance("bac ho", "ho bac") > 2
 
 
 def test_name_without_diacritics(parser):
@@ -219,3 +240,134 @@ def test_embed_isolates_an_image_the_encoder_rejects():
 
     vectors, ids, bad = encode_safely(Fussy(), ["ok1", "bad", "ok2"], ["a", "b", "c"])
     assert ids == ["a", "c"] and bad == 1 and len(vectors) == 2
+
+
+def test_unknown_relation_never_returns_the_person_themself(parser):
+    plan = parser.parse("bạn thân của Phạm Nhật Vượng")
+    (it,) = plan.intents
+    assert plan.query_type == "multi_hop" and it.unknown_relation == "bạn thân của"
+
+
+def test_relation_word_after_and_refers_to_the_previous_person(parser):
+    plan = parser.parse("Phạm Nhật Vượng và vợ")
+    first, second = plan.intents
+    assert [s.name for s in second.seeds] == ["Phạm Nhật Vượng"]
+    assert [(s.predicate, s.gender) for s in second.relation_steps] == [("spouse_of", "female")]
+
+
+def test_comma_separates_people(parser):
+    plan = parser.parse("Sơn Tùng, Hà Anh Tuấn")
+    assert [[s.name for s in it.seeds] for it in plan.intents] == [["Sơn Tùng M-TP"], ["Hà Anh Tuấn"]]
+
+
+def test_crawled_titles_and_suffixes_become_usable_aliases():
+    from app.services.entity_linker import person_key
+    rows = [dict(entity_id=f"00000000-0000-0000-0000-0000000001{i:02d}", canonical_name=n, entity_type="person",
+                 gender=None, alias_fold=fold(n))
+            for i, n in enumerate(["Ca sĩ Bằng Kiều", "Mỹ Tâm (queen Vpop)", "Ông nội Tăng Thanh Hà bồng cháu",
+                                   *[f"Nguyễn Văn {c}" for c in "ABCDEFGHIJ"]])]
+    idx = AliasIndex.from_rows(rows)
+    assert [r.name for r in idx.by_alias["bang kieu"]] == ["Ca sĩ Bằng Kiều"]
+    assert [r.name for r in idx.by_alias["my tam"]] == ["Mỹ Tâm (queen Vpop)"]
+    assert "ca si" not in idx.by_alias and "ong noi" not in idx.by_alias  # titles never match on their own
+    assert "nguyen van" not in idx.by_alias  # a prefix shared by 10 people is not a name
+    assert person_key("Mỹ Tâm (queen Vpop)") == person_key("Ca sĩ Mỹ Tâm") == person_key("Mỹ Tâm")
+    assert person_key("Cặp đôi MC Trấn Thành - Hari Won") == person_key("Trấn Thành")  # titles stack
+    assert person_key("Trấn Thành") != person_key("Trần Thành")  # same letters, another person
+    assert person_key("Mâu Thuỷ") == person_key("Mâu Thủy")  # the same mark written on another letter
+
+
+def test_a_name_finds_every_crawled_entity_of_that_person():
+    rows = [dict(entity_id=f"00000000-0000-0000-0000-0000000002{i:02d}", canonical_name=n, entity_type="person",
+                 gender=None, alias_fold=fold(n))
+            for i, n in enumerate(["MC Trấn Thành", "Cặp đôi MC Trấn Thành - Hari Won", "Trần Thành (bột ngọt)",
+                                   "Nguyễn Bảo", "Nguyễn Bảo (nhà văn)", "Trần Xuân Bách (y học)"])]
+    idx = AliasIndex.from_rows(rows)
+    assert {r.name for r in idx.by_alias["mc tran thanh"]} == {"MC Trấn Thành", "Cặp đôi MC Trấn Thành - Hari Won"}
+    assert {r.name for r in idx.by_alias["nguyen bao"]} == {"Nguyễn Bảo", "Nguyễn Bảo (nhà văn)"}
+    assert idx.one_letter_off("trn xuan bach") == ["tran xuan bach"]  # a derived alias, not stored in the DB
+    assert idx.one_letter_off("tran xuan") == []  # a word count that differs is not a typo
+
+
+def test_a_name_shared_by_duplicate_entities_is_still_its_own_intent():
+    rows = [dict(entity_id=f"00000000-0000-0000-0000-0000000003{i:02d}", canonical_name=n, entity_type="person",
+                 gender=None, alias_fold=fold(n))
+            for i, n in enumerate(["Thành Lộc", "Mạc Mai Sương (indie)", "Mạc Mai Sương (ca sĩ)"])]
+    idx = AliasIndex.from_rows(rows)
+    plan = RuleParser(lambda: idx).parse("Thành Lộc, Mạc Mai Sương")
+    assert len(plan.intents) == 2 and len(plan.intents[1].ambiguous[0].candidates) == 2
+
+
+def test_a_name_nobody_has_is_reported_not_guessed(parser):
+    for q in ("ảnh Jack Ma", "Taylor Swift", "Tuấn Anh Hà", "ảnh Thị Mỹ Tâm", "Tập Cận Bình",
+              "ảnh Tập Cận Bình đang phát biểu"):
+        assert any(it.unknown_name for it in parser.parse(q).intents), q
+    for q in ("Ảnh Minh Tuyết", "Minh Tuyết đang hát", "MC Minh Tuyết", "HLV Minh Tuyết", "TAYLOR SWIFT", "taylor swift",
+              "ảnh Hồ Gươm", "Sơn Tùng M-TP ở Hà Nội",
+              "Chùa Một Cột", "người mặc áo dài", "Bãi Biển Mỹ Khê"):
+        assert not any(it.unknown_name for it in parser.parse(q).intents), q
+
+
+def test_kinship_without_gender_or_with_ruot(parser):
+    cases = {"em của Minh Tuyết": ("sibling_of", None), "chị của Minh Tuyết": ("sibling_of", "female"),
+             "anh của Minh Tuyết": ("sibling_of", "male"), "anh chị em ruột của Minh Tuyết": ("sibling_of", None),
+             "em gái ruột của Minh Tuyết": ("sibling_of", "female"), "con ruột của Minh Tuyết": ("parent_of", None),
+             "mẹ ruột của Minh Tuyết": ("parent_of", "female"), "bà xã của Minh Tuyết": ("spouse_of", "female"),
+             "ông xã của Minh Tuyết": ("spouse_of", "male")}
+    for q, step in cases.items():
+        (it,) = parser.parse(q).intents
+        assert [(s.predicate, s.gender) for s in it.relation_steps] == [step], q
+        assert [s.name for s in it.seeds] and not it.unknown_relation, q
+
+
+def test_anh_cua_is_a_photo_unless_written_as_the_word_anh(parser):
+    for q in ("ảnh của Minh Tuyết", "anh cua minh tuyet", "em Minh Tuyết", "chị Minh Tuyết"):  # photo, or a title before the name
+        (it,) = parser.parse(q).intents
+        assert not it.relation_steps and [s.name for s in it.seeds] == ["Minh Tuyết"], q
+    assert parser.parse("ảnh").intents[0].relation_steps == []
+
+
+def test_typo_must_keep_the_accents_it_was_typed_with():
+    from app.services.query_parser import _typo_keeps_accents
+    bao_dai = [EntityRef("e1", "Bảo Đại", "person", "male")]
+    assert not _typo_keeps_accents(["áo", "dài"], bao_dai)        # "người mặc áo dài"
+    assert not _typo_keeps_accents(["đang", "hát"], [EntityRef("e2", "Đặng Tất", "person", "male")])
+    assert _typo_keeps_accents(["ao", "dai"], bao_dai)            # typed without accents: no evidence either way
+    assert _typo_keeps_accents(["trn", "thị", "thùy", "dung"],
+                               [EntityRef("e3", "Trần Thị Thùy Dung", "person", "female")])
+
+
+def test_description_pieces_for_partial_caption_match():
+    from app.services.retriever import _units
+    assert _units("ca si dang hat tren san khau") == ["ca <-> si", "san <-> khau", "hat"]
+    assert _units("nguoi mac ao dai") == ["mac <-> ao", "ao <-> dai"]
+    # "công viên" is also Văn Công Viễn once accents are gone: neither the pair nor its words count alone
+    assert _units("cong vien nuoc", {"cong vien"}) == ["vien <-> nuoc"]
+    assert _units("anh") == []
+
+
+def test_full_name_not_in_data_is_not_cut_to_a_look_alike():
+    names = ["Nguyễn Chí Thiện", "Nguyễn Chí Dũng", "Lê Văn Thanh", "Trần Thanh", "Phạm Thị Thanh", "Sơn Tùng M-TP"]
+    rows = [{"alias_fold": fold(n), "entity_id": f"e{i}", "canonical_name": n, "entity_type": "person",
+             "gender": None} for i, n in enumerate(names)]
+    idx = AliasIndex.from_rows(rows)
+    parser = RuleParser(lambda: idx)
+    for q in ("Nguyễn Chí Thanh", "nguyen chi thanh", "ảnh nguyễn chí thanh đang phát biểu"):
+        it = parser.parse(q).intents[0]
+        assert it.unknown_name and not it.seeds and not it.ambiguous, q
+    # the first words alone still offer the people they open, and a description after them stays a description
+    assert parser.parse("Nguyễn Chí").intents[0].ambiguous
+    it = parser.parse("Sơn Tùng đang hát").intents[0]
+    assert [s.name for s in it.seeds] == ["Sơn Tùng M-TP"] and not it.unknown_name
+
+
+def test_relation_of_a_one_word_name_nobody_has_is_not_a_description():
+    rows = [{"alias_fold": fold(n), "entity_id": f"e{i}", "canonical_name": n, "entity_type": "person",
+             "gender": None} for i, n in enumerate(["Mỹ Tâm", "Sơn Tùng M-TP"])]
+    parser = RuleParser(lambda: AliasIndex.from_rows(rows))
+    for q in ("con trai của Bear", "ông nội của Bear", "bạn thân của Trang"):
+        it = parser.parse(q).intents[0]
+        assert it.unknown_name and not it.seeds, q
+    # a photo of someone, a place, or a known name after "của" are not flagged
+    for q in ("ảnh của Bear", "áo dài của Huế", "con gái của Mỹ Tâm"):
+        assert not parser.parse(q).intents[0].unknown_name, q

@@ -30,14 +30,21 @@ h1 { margin: 0 0 16px; font-size: 1.6rem; }
 h2 { font-size: 1.05rem; margin: 24px 0 8px; }
 .muted { color: var(--muted); font-size: 0.9rem; }
 .searchbar { display: flex; gap: 8px; }
+.query { flex: 1; min-width: 0; position: relative; }
 .searchbar input {
-  flex: 1; min-width: 0; padding: 12px 14px; font-size: 1rem; border-radius: 10px;
+  width: 100%; padding: 12px 44px 12px 14px; font-size: 1rem; border-radius: 10px;
   border: 1px solid var(--line); background: var(--card); color: var(--fg);
 }
 button { cursor: pointer; font: inherit; }
 .searchbar button {
   padding: 0 20px; border-radius: 10px; border: 0; background: var(--accent); color: var(--accent-fg);
 }
+.searchbar .clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; padding: 0; border-radius: 50%;
+  background: transparent; color: var(--muted); font-size: 1.4rem; line-height: 1;
+}
+.searchbar .clear:hover { background: var(--line); color: var(--fg); }
 .examples { margin: 12px 0 20px; display: grid; gap: 6px; }
 .example-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .example-row > .muted { min-width: 100px; }

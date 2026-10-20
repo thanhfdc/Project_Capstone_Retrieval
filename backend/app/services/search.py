@@ -1,6 +1,7 @@
 """Search orchestration: parse -> resolve relations -> retrieve -> fuse -> hydrate."""
 from __future__ import annotations
 
+import os
 import threading
 import time
 import uuid
@@ -11,7 +12,7 @@ from ..config import Settings
 from ..textnorm import fold
 from . import relations as rel
 from . import retriever as R
-from .entity_linker import EntityLinker, EntityRef
+from .entity_linker import EntityLinker, EntityRef, person_key
 from .query_parser import Intent, QueryPlan, RuleParser
 
 
@@ -88,7 +89,9 @@ class SearchService:
         import json
         snap = json.loads(row["value"]) if row else {}
         return {"serving_images": live["n"], "encoder_offline": enc["value"] if enc else None,
-                "encoder_online": getattr(self.encoder, "name", "?"), "snapshot": snap}
+                "encoder_online": getattr(self.encoder, "name", "?"), "snapshot": snap,
+                "api_workers": int(os.environ.get("WEB_CONCURRENCY", "1")),
+                "encoder_threads": self.s.encoder_threads, "db_pool_max": self.s.db_pool_max}
 
     # ---- planning helpers ---------------------------------------------------------------
     def _needs_llm(self, plan: QueryPlan) -> bool:
@@ -134,24 +137,26 @@ class SearchService:
         blocks, because "same photo as one of several people" has no sensible default."""
         blocking, refine = [], []
         for it in plan.intents:
-            together = len(it.seeds) + len(it.ambiguous) > 1
+            together = len({person_key(s.name) for s in it.seeds}) + len(it.ambiguous) > 1
             unresolved = []
             for span in it.ambiguous:
                 chosen = [c for c in span.candidates if c.entity_id in selected]
                 option = {"mention": span.text, "candidates": [
                     {"entity_id": c.entity_id, "name": c.name, "entity_type": c.entity_type}
                     for c in span.candidates]}
+                one_person = len({person_key(c.name) for c in span.candidates}) == 1
                 if chosen:
                     it.seeds.extend(chosen)
+                elif one_person:  # duplicates of one person ("Mỹ Tâm", "Mỹ Tâm (queen Vpop)"): search them all
+                    it.seeds.extend(span.candidates)
                 elif together:
                     unresolved.append(span)
                     blocking.append(option)
                 else:
                     it.seeds.extend(span.candidates)
-                    if len({fold(c.name) for c in span.candidates}) > 1:  # same name twice = one person
-                        refine.append(option)
+                    refine.append(option)
             it.ambiguous = unresolved
-            if together and not unresolved:
+            if together and not unresolved and len({person_key(s.name) for s in it.seeds}) > 1:
                 it.entity_operator = "all"
         return blocking, refine
 
@@ -178,6 +183,12 @@ class SearchService:
             persons = [s for s in it.seeds if s.entity_type != "place"]
             places = [s for s in it.seeds if s.entity_type == "place"]
             scope = location_scope
+            if it.unknown_name:  # "Jack Ma" must not return "Jack", nor strangers who look alike
+                jobs.append((n, it.label, [], "any", "", "", None, "no_seed_entity", []))
+                continue
+            if it.unknown_relation:
+                jobs.append((n, it.label, [], "any", "", "", None, "no_verified_relation", []))
+                continue
             if it.relation_steps:
                 if not seed_ids:
                     jobs.append((n, it.label, [], "any", "", "", None, "no_seed_entity", []))
@@ -219,7 +230,8 @@ class SearchService:
                 groups.append(group)
                 continue
             group["image_ids"], group["retrieval"] = self._retrieve(conn, ids, operator, visual, lexical,
-                                                                    scope, vectors.get(visual), k)
+                                                                    scope, vectors.get(visual), k,
+                                                                    fold(plan.location_text))
             if not group["image_ids"]:
                 group["status"] = "no_images_for_target" if hops else "no_results"
             groups.append(group)
@@ -248,13 +260,15 @@ class SearchService:
             seed = f"{step.label} {seed}"
         return seed
 
-    def _retrieve(self, conn, ids, operator, visual, lexical, scope, qvec, k):
+    def _retrieve(self, conn, ids, operator, visual, lexical, scope, qvec, k, extra=""):
         """Return (ranked image ids, which branches ran)."""
         cand = self.s.candidate_k
         if ids is not None:
-            if operator == "all" and len(ids) > 1:
+            if operator == "all" and len(ids) > 1:  # same photo
                 # same-photo: only images linked to all entities; then rank by visual text if any
-                base = R.images_by_entities(conn, ids, "all", cand)
+                by_id, keys = self.linker.index.by_id, {}
+                groups = [keys.setdefault(person_key(by_id[i].name) if i in by_id else i, len(keys)) for i in ids]
+                base = R.images_by_entities(conn, ids, "all", cand, groups)
                 if not base or qvec is None:
                     return base[:k], ["entity_sql"]
                 ranked = R.vector_search(conn, qvec, cand, ids)
@@ -267,13 +281,25 @@ class SearchService:
             fused = R.fuse_rrf([[i for i, _ in vec], [i for i, _ in lex]], k_rrf=self.s.rrf_k)
             return [i for i, _ in fused[:k]], ["vector", "lexical"]
 
-        # no entity: whole corpus, optionally restricted to a place scope
-        scope_entities = scope if scope else None
-        vec = R.vector_search(conn, qvec, cand, scope_entities) if qvec is not None else []
-        lex = R.lexical_search(conn, lexical, cand, scope_entities)
-        if scope_entities and not vec and not lex:
+        # no entity: images of a place if one was named, else the whole corpus
+        if scope:
+            vec = R.vector_search(conn, qvec, cand, scope) if qvec is not None else []
+            lex = R.lexical_search(conn, lexical, cand, scope)
+        if not scope or (not vec and not lex):
+            # nothing narrows the search, so only confident matches count
             vec = R.vector_search(conn, qvec, cand, None) if qvec is not None else []
-            lex = R.lexical_search(conn, lexical, cand, None)
+            vec = [(i, score) for i, score in vec if score >= self.s.min_visual_score]
+            lex = R.lexical_search(conn, lexical, cand, None, require_all=True)
+            fused = [i for i, _ in R.fuse_rrf([[i for i, _ in vec], [i for i, _ in lex]], k_rrf=self.s.rrf_k)]
+            if len(fused) >= k:
+                return fused[:k], ["vector", "lexical"]
+            # too few confident matches: add captions that share most of the description, ordered by how
+            # much of it they say and by how close the photo looks
+            core = lexical[:-len(extra)].strip() if extra and lexical.endswith(extra) else lexical
+            partial = R.lexical_partial(conn, core, cand, extra, self.linker.index.name_pairs)
+            ranked = R.rank_by_vector(conn, qvec, partial) if qvec is not None else partial
+            more = [i for i, _ in R.fuse_rrf([partial, ranked], k_rrf=self.s.rrf_k) if i not in set(fused)]
+            return (fused + more)[:k], ["vector", "lexical", "lexical_partial"]
         fused = R.fuse_rrf([[i for i, _ in vec], [i for i, _ in lex]], k_rrf=self.s.rrf_k)
         return [i for i, _ in fused[:k]], ["vector", "lexical"]
 

@@ -14,11 +14,18 @@ class Settings(BaseSettings):
     encoder_backend: str = "siglip"
     embedding_dim: int = 768
     encoder_threads: int = 4
+    # Connections per API process. Each uvicorn worker has its own pool, so workers x db_pool_max must stay
+    # below Postgres max_connections (50 in compose.yaml).
+    db_pool_max: int = 10
 
     top_k_default: int = 20
     candidate_k: int = 100
     rrf_k: int = 60
     hnsw_ef_search: int = 100
+    # Description-only searches over the whole corpus drop images whose cosine similarity is below this,
+    # so "con mèo" answers "no results" instead of the least-unrelated photos. Measured with app.jobs.calibrate on
+    # the 90K corpus: absent subjects top out at 0.139, present ones start at 0.158.
+    min_visual_score: float = 0.148
     request_deadline_ms: int = 2700
     result_cache_size: int = 512
     result_cache_enabled: bool = True

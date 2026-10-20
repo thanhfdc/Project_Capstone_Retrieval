@@ -27,6 +27,14 @@ def _step_sql(step: RelationStep) -> str:
     inn = f"""SELECT r.object_id AS from_id, r.subject_id AS to_id, r.source_url
               FROM relations r JOIN entities e ON e.entity_id = r.subject_id
               WHERE r.verified AND r.predicate = %(predicate)s AND r.object_id = ANY(%(ids)s::uuid[]) {gender}"""
+    if step.predicate == "sibling_of":
+        # stated siblings, plus children of the same parent
+        shared = f"""SELECT a.object_id AS from_id, b.object_id AS to_id, b.source_url
+              FROM relations a JOIN relations b ON b.subject_id = a.subject_id AND b.object_id <> a.object_id
+              JOIN entities e ON e.entity_id = b.object_id
+              WHERE a.verified AND b.verified AND a.predicate = 'parent_of' AND b.predicate = 'parent_of'
+                AND a.object_id = ANY(%(ids)s::uuid[]) {gender}"""
+        return f"{out} UNION {inn} UNION {shared}"
     if step.direction == "out":
         return out
     if step.direction == "in":

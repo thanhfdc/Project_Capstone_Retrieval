@@ -26,7 +26,7 @@ def get_pool() -> ConnectionPool:
         _pool = ConnectionPool(
             get_settings().database_url,
             min_size=2,
-            max_size=10,
+            max_size=max(2, get_settings().db_pool_max),
             kwargs={"row_factory": dict_row, "autocommit": True},
             configure=_configure,
             open=True,
@@ -56,9 +56,14 @@ def connect(autocommit: bool = False):
 
 
 def migrate() -> None:
+    # Every uvicorn worker runs this at startup; the advisory lock makes them take turns.
     with connect(autocommit=True) as conn:
-        for path in sorted(MIGRATIONS.glob("*.sql")):
-            conn.execute(path.read_text(encoding="utf-8"))
+        conn.execute("SELECT pg_advisory_lock(7240001)")
+        try:
+            for path in sorted(MIGRATIONS.glob("*.sql")):
+                conn.execute(path.read_text(encoding="utf-8"))
+        finally:
+            conn.execute("SELECT pg_advisory_unlock(7240001)")
 
 
 def get_meta(conn, key: str, default: str | None = None) -> str | None:

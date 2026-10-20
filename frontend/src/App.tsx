@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { search, stats, type Item, type SearchResponse, type Stats } from "./api";
 
 const EXAMPLES: { type: string; queries: string[] }[] = [
-  { type: "Single intent", queries: ["bãi biển Nha Trang", "Sơn Tùng đang biểu diễn trên sân khấu"] },
-  { type: "Multi-intent", queries: ["hồ bơi và công viên nước ở Phú Quốc", "Sơn Tùng chụp cùng Hà Anh Tuấn"] },
-  { type: "Multi-hop", queries: ["ảnh con trai chủ tịch Phạm Nhật Vượng", "con trai của người sáng lập Vingroup"] },
+  { type: "Single intent", queries: ["Mỹ Tâm đang hát trên sân khấu", "người mặc áo dài"] },
+  { type: "Multi-intent", queries: ["Đen Vâu và Suboi", "Mỹ Tâm hoặc Hồ Ngọc Hà"] },
+  { type: "Multi-hop", queries: ["vợ của Trấn Thành", "con gái của chồng Mỹ Linh", "vợ của người sáng lập Vingroup"] },
 ];
 
 const TYPE_LABEL: Record<string, string> = {
@@ -31,6 +31,7 @@ export default function App() {
   const [corpus, setCorpus] = useState<Stats | null>(null);
   const [detail, setDetail] = useState<Item | null>(null);
   const inflight = useRef<AbortController | null>(null);
+  const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     stats().then(setCorpus);
@@ -57,6 +58,17 @@ export default function App() {
     }
   }
 
+  function clear() {
+    inflight.current?.abort();
+    setQuery("");
+    setResult(null);
+    setError(null);
+    setClientMs(null);
+    setDetail(null);
+    setLoading(false);
+    input.current?.focus();
+  }
+
   return (
     <div className="page">
       <header>
@@ -75,13 +87,22 @@ export default function App() {
           run(query);
         }}
       >
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ví dụ: hồ bơi và công viên nước ở Phú Quốc"
-          aria-label="Truy vấn"
-          autoFocus
-        />
+        <div className="query">
+          <input
+            ref={input}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && clear()}
+            placeholder="Ví dụ: vợ của Trấn Thành"
+            aria-label="Truy vấn"
+            autoFocus
+          />
+          {(query || result) && (
+            <button type="button" className="clear" onClick={clear} aria-label="Xóa tìm kiếm" title="Xóa (Esc)">
+              ×
+            </button>
+          )}
+        </div>
         <button type="submit" disabled={loading}>
           {loading ? "Đang tìm…" : "Tìm"}
         </button>

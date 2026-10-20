@@ -137,3 +137,46 @@ def test_ambiguous_prefix_shows_all_and_offers_refinement(client):
 def test_ambiguous_name_in_same_photo_query_asks(client):
     r = search(client, "Sơn Tùng chụp cùng Phạm Nhật")
     assert r["status"] == "needs_clarification"
+
+
+def test_description_without_a_confident_match_returns_nothing(client):
+    from app.config import get_settings
+    settings = get_settings()
+    old = settings.min_visual_score
+    settings.min_visual_score = 1.01  # cosine never reaches this
+    try:
+        r = client.post("/api/search?nocache=true", json={"query": "con mèo ngủ trên ghế", "top_k": 10}).json()
+    finally:
+        settings.min_visual_score = old
+    assert r["status"] == "no_results" and not r["items"]
+
+
+def test_typo_is_corrected_but_a_different_name_is_not(client):
+    typo = search(client, "Hà Ang Tuấn")  # one letter wrong
+    assert typo["status"] == "ok" and all("Hà Anh Tuấn" in n for n in names(typo))
+    other = client.post("/api/search?nocache=true", json={"query": "Tuấn Anh Hà", "top_k": 10}).json()
+    assert not any(it["seeds"] for it in other["interpretation"]["intents"])  # reordered words are not a typo
+    assert other["status"] == "no_seed_entity"  # nor a text match: "bác hồ" must not find "Hồ Bắc"
+
+
+def test_sibling_stated_and_through_a_shared_parent(client):
+    r = search(client, "em trai của Hà Anh Tuấn")  # stated sibling relation
+    assert r["status"] == "ok" and all("Sơn Tùng M-TP" in n for n in names(r))
+    r = search(client, "anh trai của Sơn Tùng M-TP")  # same relation read from the other side
+    assert r["status"] == "ok" and all("Hà Anh Tuấn" in n for n in names(r))
+    r = search(client, "em gái của Đen Vâu")  # no sibling row, but both are children of one parent
+    assert r["status"] == "ok" and all("Mỹ Tâm" in n for n in names(r))
+    r = search(client, "anh trai của Đen Vâu")  # his only sibling is a sister
+    assert r["status"] == "no_verified_relation"
+
+
+def test_unsupported_relation_returns_no_photos_of_the_person(client):
+    r = search(client, "bạn thân của Mỹ Tâm")
+    assert r["status"] == "no_verified_relation" and not r["items"]
+
+
+def test_sibling_asked_without_gender(client):
+    r = search(client, "em của Hà Anh Tuấn")
+    assert r["status"] == "ok" and all("Sơn Tùng M-TP" in n for n in names(r))
+    r = search(client, "anh của Sơn Tùng M-TP")
+    assert r["status"] == "ok" and all("Hà Anh Tuấn" in n for n in names(r))

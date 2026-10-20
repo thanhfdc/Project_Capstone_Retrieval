@@ -1,7 +1,183 @@
 name,entity_type,gender,aliases,entity_id
-Phạm Nhật Vượng,person,male,Vượng Vingroup,
-Phạm Nhật Quân Anh,person,male,,
-Phạm Nhật Minh Hoàng,person,male,,
+Phạm Nhật Vượng,person,male,Vượng Vingroup|tỷ phú Phạm Nhật Vượng,57168659-abcd-4ead-9fe7-11afdfe71fa7
+Phạm Thu Hương,person,female,bà Phạm Thu Hương,2344f939-49e1-4cdd-a907-28280ead1e8c
+Phạm Nhật Quân Anh,person,male,,e10194a6-2770-4055-97b4-072c21bc1162
+Phạm Nhật Minh Hoàng,person,male,,9a5d2412-a93c-4c50-b57f-0263e8a83d78
+Trấn Thành,person,male,MC Trấn Thành,e240e987-c905-4e73-8c43-48443b4c2435
+Hari Won,person,female,MC Hari Won,ddfb07ac-165e-460a-9e55-9aba08f41e88
+Đông Nhi,person,female,ca sĩ Đông Nhi,a1f97935-35d7-4f87-b43f-ca14b11ce5d5
+Lưu Hương Giang,person,female,,32b26d2e-8ba0-4417-882b-fc61bbe6b5ae
+Hồ Hoài Anh,person,male,nhạc sĩ Hồ Hoài Anh,8d7b86ee-5ec7-4114-8d9f-0037b1a38cda
+Tóc Tiên,person,female,ca sĩ Tóc Tiên,b5831b34-957f-4be0-8bcb-c885c9b93352
+Hoàng Touliver,person,male,Touliver,c379af63-395c-45db-8c2b-904eca52f1b2
+Rhymastic,person,male,Vũ Đức Thiện,f9ed4187-7121-4e7d-b859-37aa0f5a9aa7
+JustaTee,person,male,Justatee,bdec14df-0999-4c0c-80e8-ff932a26e36d
+Binz,person,male,rapper Binz,9c863962-b843-461e-bc22-85e53b7ff808
+SlimV,person,male,Slim V,772742a0-1544-4167-8e43-eb1088bf1e97
+Thủy Tiên,person,female,ca sĩ Thủy Tiên,4325f774-e59d-4cdf-8a89-c2b5773ceb33
+Lê Công Vinh,person,male,Công Vinh,5acfc73b-eb8d-48f6-8702-1c6e608fdb85
+Khánh Thi,person,female,vũ công Khánh Thi,0313913b-20dd-4370-bff8-52c04f451e1d
+Phan Hiển,person,male,vũ công Phan Hiển,c924dd63-f034-49a8-bec7-47d687620ee3
+Thanh Lam,person,female,NSND Thanh Lam|diva Thanh Lam,3ea1a6d3-df72-404a-be3d-be7d45e90acb
+Quốc Trung,person,male,nhạc sĩ Quốc Trung,5059fdfb-8194-41b8-a465-e970b59f749e
+Thuận Yến,person,male,nhạc sĩ Thuận Yến,f5d66701-4aa6-4df7-a8b3-846e9f2aa70e
+Trung Kiên,person,male,NSND Trung Kiên,99a8a8c1-0294-454c-a2d0-88a2ddab493f
+Mỹ Linh,person,female,diva Mỹ Linh|ca sĩ Mỹ Linh,40e9140d-b200-4751-9d7f-d09cdec74601
+Anh Quân,person,male,nhạc sĩ Anh Quân,91efe3a6-75be-401b-b4d7-c647b72fe681
+Mỹ Anh,person,female,ca sĩ Mỹ Anh,db4977ad-81a4-424c-8180-92d17b4899c9
+Bằng Kiều,person,male,ca sĩ Bằng Kiều,8b090dba-176b-42ee-8474-b16c28f7f70b
+Trizzie Phương Trinh,person,female,Phương Trinh (vợ cũ Bằng Kiều),32ae8d19-2a71-46f3-906f-c357799c8422
+Trương Ngọc Ánh,person,female,,b62082be-a7d1-411b-8ecd-87bd222054a9
+Trần Bảo Sơn,person,male,diễn viên Trần Bảo Sơn,f7508bd7-c535-43d4-b1b8-a8ae0dd5cceb
+Mạc Hồng Quân,person,male,cầu thủ Mạc Hồng Quân,f252f68c-4fef-4d97-bc8a-98845f5ccf08
+Kỳ Hân,person,female,người mẫu Kỳ Hân,70741e08-95e1-4b09-8911-fe270f1d7866
+Cường Đô La,person,male,Cường Đôla|Nguyễn Quốc Cường,3435e348-cb5e-49cf-8c72-d52e0a521b87
+Đàm Thu Trang,person,female,,ee575125-d903-4eb1-a50c-4c8c68afb994
+Lan Khuê,person,female,người mẫu Lan Khuê|Trần Ngọc Lan Khuê,35386035-63cd-44d0-b343-4e35cb22609b
+Đan Lê,person,female,MC Đan Lê,1f19003c-9b60-4b9c-90c1-afa1f8fbcb2e
+Diệu Nhi,person,female,,fd4eb261-743b-4aca-a181-0532bb9b26fa
+Anh Tú,person,male,Anh Tú Atus,0cc71977-d13b-4a40-9be7-8dccbe3a25b6
+Đỗ Mỹ Linh,person,female,Hoa hậu Đỗ Mỹ Linh,bc9b630c-e122-4c31-9087-797fed8fc788
+Đỗ Quang Hiển,person,male,bầu Hiển,0c7e5c97-8831-4575-ad06-fb28aaf6b388
+Đỗ Quang Vinh,person,male,,2fd8064b-2d43-456a-80a6-1805082cf770
+Trần Văn Khê,person,male,GS Trần Văn Khê,881743f2-4cee-476d-9638-ca1248858af4
+Trần Quang Hải,person,male,GS Trần Quang Hải,bd134b53-7696-48e0-a6df-ad79b460d321
+Bạch Yến,person,female,ca sĩ Bạch Yến,36f358a8-afb6-41be-b66f-874d0ff36cc0
+Phạm Duy,person,male,nhạc sĩ Phạm Duy,da48d079-80af-45bb-9f8b-e1e67a235685
+Duy Quang,person,male,ca sĩ Duy Quang,47eb8816-6997-4117-9c9a-aeab12f74576
+Thái Thanh,person,female,danh ca Thái Thanh,f118ac0e-a1f2-49d0-980f-6397eb7acebf
+Ý Lan,person,female,ca sĩ Ý Lan,9ca650cc-b5ee-47fd-b6f4-104ad44bf8f6
+Nguyễn Sinh Sắc,person,male,cụ Phó bảng Nguyễn Sinh Sắc,c02e8135-8ff1-4cb3-8bbd-58d3535bca74
+Hồ Chí Minh,person,male,Bác Hồ|Chủ tịch Hồ Chí Minh|Nguyễn Ái Quốc,53d5625e-36f3-48e2-935d-105632a5ca2f
+Lê Hồng Phong,person,male,,0bdf3596-fdad-43a7-9000-8adb222d1a6e
+Nguyễn Thị Minh Khai,person,female,Minh Khai,4f6a0451-7d39-4f0e-9b78-176ad17298ff
+Võ Nguyên Giáp,person,male,Đại tướng Võ Nguyên Giáp,afc6a18f-63c7-4558-a402-760b82ba15f7
+Nguyễn Tấn Dũng,person,male,Thủ tướng Nguyễn Tấn Dũng,b0a22d6d-2d47-40f1-b84f-c3dba516dcca
+Nguyễn Thanh Nghị,person,male,,c0c92c45-bdc0-4a51-9858-e55f1ea5b77a
+Phi Nhung,person,female,ca sĩ Phi Nhung,e491dc5f-7c4d-4a8f-8ac8-45c302654d26
+Hồ Văn Cường,person,male,ca sĩ Hồ Văn Cường,5609c680-fd36-4974-a465-4dd32f93a035
+Johnathan Hạnh Nguyễn,person,male,Jonathan Hạnh Nguyễn|vua hàng hiệu,4209043c-57f8-4baa-9c23-069cd5104004
+Lê Hồng Thủy Tiên,person,female,,34a7dfd5-3daa-4382-870f-3ced85861f4a
+Tiên Nguyễn,person,female,Nguyễn Thảo Tiên,7ceb989c-44c5-4930-a2ee-bd2878fe67e4
+Tăng Thanh Hà,person,female,Hà Tăng,1d10b6c8-7309-449d-8e62-ea53be295252
+Đặng Lê Nguyên Vũ,person,male,vua cà phê,bf43d0ff-03c9-4b75-8fac-40f5291fc058
+Lê Hoàng Diệp Thảo,person,female,bà Diệp Thảo,4a60622f-17d3-45cf-a647-8342b53a915f
+Huỳnh Bích Ngọc,person,female,,a8ab6a97-a585-426a-aa71-953ab9831e5d
+Đặng Huỳnh Ức My,person,female,Ức My,c7bd4fbe-5a23-4664-afba-dc8076e2e72b
+Trương Gia Bình,person,male,,ae1af54f-a8b6-4caa-8e31-b4c7321e8953
+Bùi Quang Ngọc,person,male,,3422a829-0c85-4e05-9d91-b100c2e1c8c3
+Nguyễn Đăng Quang,person,male,,0deb51e7-a520-465d-9ba8-875d90898a4f
+Trần Bá Dương,person,male,,9b05c58a-eacb-4c62-b0f5-db3e85b48b8c
+Nguyễn Thị Phương Thảo,person,female,tỷ phú Phương Thảo,987d746a-e407-4ef5-a735-eb891e4fd2a4
+Trần Đình Long,person,male,vua thép,d442c881-579c-4d85-8f72-c3d1f762f7fe
+Lê Viết Lam,person,male,,159788aa-0081-44d2-8e83-8871487425bc
+Lê Hồng Minh,person,male,,3c3c9923-56e7-4465-bb8c-f9246f05df02
+Nguyễn Thành Trung,person,male,Trung Nguyễn Sky Mavis,8d3dd584-416e-4740-819f-b088e4bf8f45
+Nguyễn Hà Đông,person,male,Dong Nguyen|cha đẻ Flappy Bird,268769a0-c9b6-46f2-a3e2-690d0d258f18
+Bùi Thành Nhơn,person,male,,a806d709-72a1-46e1-a8a1-39e2594fd650
+Nguyễn Thị Nga,person,female,Madame Nga|bà Nguyễn Thị Nga BRG,f4f547d2-655d-48d1-988b-d498ba2e57e8
+Đặng Thị Hoàng Yến,person,female,,97abf4ae-9c31-4bcb-a12e-13538743b848
+Isaac,person,male,Phạm Lưu Tuấn Tài,72c29120-aa55-4869-bcf4-54bae313bfac
+Jun Phạm,person,male,Phạm Duy Thuận,39251395-4a83-4d40-9454-1f02e8ecde61
+Will,person,male,Will 365,33f499a0-44e7-43e6-960f-b50419e1fa84
+S.T Sơn Thạch,person,male,S.T|Sơn Thạch,e4570420-642d-483e-b3f8-42bb480bd167
+Tronie,person,male,Tronie Ngô,e6f2622a-9c84-4ceb-9d41-0505e5c6e5a0
+Lê Minh,person,male,Lê Minh MTV,cd3e0fe0-ea09-48af-b3a8-e9784eac3d4d
+Anh Tuấn,person,male,Anh Tuấn MTV,65e47bfe-eed4-41a3-b916-cca3573a4353
+Lý Tuấn Kiệt,person,male,,14fe6b5c-f307-40ac-940e-8e1e6a8c6363
+TiTi,person,male,Ti Ti,f2d3df0b-4151-45c5-9bb7-b02970cf7b42
+Hồ Gia Hùng,person,male,,b2a4b8e8-e2ed-4ef3-b989-e7ae217c41df
+Grey D,person,male,GREY D|Đoàn Thế Lân,1f9c4cd2-076a-42ee-a136-473f25a1e04c
+Nicky,person,male,Trần Phong Hào,9d5b9b5c-f022-402d-b12a-72ab92386dc2
+Erik,person,male,ca sĩ Erik,da878ead-461c-41df-97db-588063d5be6a
+JGKiD,person,male,,6351bbc2-d9b7-4296-b0a8-4b0476a1085b
+Rabbit Run,person,male,Thỏ,22edf7e1-0c44-41a6-850f-9b331e77df13
+Trần Lập,person,male,,00c5eb61-4931-4cb3-94c7-cc06793c23ba
+Trần Tuấn Hùng,person,male,,c2aea010-9326-4c12-b961-de4968c2a247
+Nguyễn Hoàng,person,male,Nguyễn Hoàng Bức Tường,5855462d-22c0-4fdd-b24e-9b18a0cd973c
+Thúy Nga,person,female,Thúy Nga Mắt Ngọc,8ac1feb5-dc6a-4d8e-8e5c-b40b8706be1d
+Tiến Dũng,person,male,Tiến Dũng The Men,d6374af1-add5-4ce6-b500-502d312d2859
+Lê Hoàng,person,male,Lê Hoàng The Men,ac7e7019-b4e1-4b78-83f4-005092aa1602
+Liz Kim Cương,person,female,,ba967add-a253-487c-896f-381a93aa5a30
+Đoàn Văn Hậu,person,male,Văn Hậu,187edb73-9884-4cdc-97dc-b55cf1e645a8
+Nguyễn Quang Hải,person,male,Quang Hải,891a5f39-bb86-41a0-a211-8278dc6dac0b
+Ông Cao Thắng,person,male,chồng Đông Nhi,
+John Tuấn Nguyễn,person,male,Tuấn John,
+Khải Anh,person,male,đạo diễn Khải Anh|Nguyễn Khải Anh,
+Đỗ Vinh Quang,person,male,,
+Thái Hằng,person,female,ca sĩ Thái Hằng,760c601a-706e-44c7-999e-283bfb616d90
+Đặng Bích Hà,person,female,,
+Nguyễn Thị Quang Thái,person,female,,
+Louis Nguyễn (con trai Johnathan Hạnh Nguyễn),person,male,,
+Đặng Văn Thành,person,male,ông Đặng Văn Thành Sacombank,
+Viên Diệu Hoa,person,female,,
+Nguyễn Thanh Hùng (Sovico),person,male,chồng Nguyễn Thị Phương Thảo,
+Vũ Thị Hiền,person,female,vợ Trần Đình Long,
+Doãn Hải My,person,female,Hải My,
+Chu Thanh Huyền,person,female,,
 Vingroup,organization,,Tập đoàn Vingroup|Tập đoàn Vin,
+FPT,organization,,Tập đoàn FPT,
+Masan,organization,,Masan Group|Tập đoàn Masan,
+THACO,organization,,Trường Hải|Tập đoàn Trường Hải|Thaco,
+Vietjet,organization,,Vietjet Air|hãng hàng không Vietjet,
+Hòa Phát,organization,,Tập đoàn Hòa Phát,
+Sun Group,organization,,Tập đoàn Mặt Trời,
+VNG,organization,,VinaGame,
+Sky Mavis,organization,,Axie Infinity,
+dotGears,organization,,.Gears,
+Trung Nguyên,organization,,cà phê Trung Nguyên|Tập đoàn Trung Nguyên,
+NovaGroup,organization,,Novaland,
+BRG,organization,,Tập đoàn BRG,
+T&T Group,organization,,Tập đoàn T&T,
+Tân Tạo,organization,,Tập đoàn Tân Tạo,
+IPPG,organization,,IPP Group|Tập đoàn Liên Thái Bình Dương,
+Thành Thành Công,organization,,TTC Group|Tập đoàn TTC,
+Sacombank,organization,,Ngân hàng Sài Gòn Thương Tín,
+365daband,organization,,nhóm 365|365,7a54a575-b563-4d46-9b83-c00747b7719c
+MTV,organization,,nhóm MTV|ban nhạc MTV,bd82435a-4133-4f30-bbe8-88092841f3da
+HKT,organization,,nhóm HKT,d54bbd96-4b64-4152-8541-b112eed10b22
+Monstar,organization,,nhóm Monstar|MONSTAR,3cde7508-05b1-4798-a7d8-cc03efe75e09
+Da LAB,organization,,nhóm Da LAB,eb85f1bb-576e-47e5-9adf-22a163762d6c
+Bức Tường,organization,,ban nhạc Bức Tường,975f377a-f800-4006-a9fa-95264205c1f2
+SpaceSpeakers,organization,,nhóm SpaceSpeakers|SpaceSpeakers Group,357caf5b-62cf-42ec-8a75-14d4498150ce
+Mắt Ngọc,organization,,nhóm Mắt Ngọc,
+The Men,organization,,nhóm The Men,c07ca156-49c9-4764-a013-f7ed8ab8d17a
+LIME,organization,,nhóm LIME|LiME,c155315e-a50a-43c0-8017-e6e42b3e80b2
 Nha Trang,place,,Thành phố Nha Trang,
 Phú Quốc,place,,Đảo Phú Quốc,
+Phạm Thúy Hằng,person,female,bà Phạm Thúy Hằng|Phạm Thuý Hằng|Thúy Hằng Vingroup,c5d2f345-f4ab-489c-ba1a-bb65efb1ebf5
+Phạm Nhật Vũ,person,male,ông Phạm Nhật Vũ,8f334858-7351-4923-9f46-d1e039e35928
+Đặng Thành Tâm,person,male,ông Đặng Thành Tâm|Đặng Thành Tâm Tân Tạo,87341dd6-68bb-4e25-8599-68dd7f5b05e2
+Đặng Thị Hoàng Phượng,person,female,bà Đặng Thị Hoàng Phượng,dfa56e1a-00ea-4561-8afe-bd33c190a989
+Trần Kim Thành,person,male,ông Trần Kim Thành|Trần Kim Thành Kido,4e395ca6-645b-4873-ab33-025c021bcc1b
+Trần Lệ Nguyên,person,male,ông Trần Lệ Nguyên,bc6d717e-0257-40ee-9ca7-c19e547738f6
+Trầm Trọng Ngân,person,male,ông Trầm Trọng Ngân,7abe0800-4349-4624-b203-117bfedd745a
+Trầm Khải Hòa,person,male,ông Trầm Khải Hòa|Trầm Khải Hoà,2a40680e-81a6-440f-8a81-5a7d0f5b0000
+Cẩm Ly,person,female,ca sĩ Cẩm Ly,c658dc1d-7cb9-40b6-b62e-52157f0757ed
+Minh Tuyết,person,female,ca sĩ Minh Tuyết,9ba2edd8-f258-4619-b3dd-500b6a53a1aa
+Hà Phương,person,female,ca sĩ Hà Phương,d5336bfd-0a5f-496e-be1f-69c9fc9904a3
+Tuấn Ngọc,person,male,ca sĩ Tuấn Ngọc|danh ca Tuấn Ngọc,47c714a8-a928-4f62-b8ff-02c6550eb07d
+Khánh Hà,person,female,ca sĩ Khánh Hà,b3e14dee-552c-44d4-8cec-eaf8b10a495d
+Phạm Đình Chương,person,male,nhạc sĩ Phạm Đình Chương|Hoài Bắc,4dbd92f2-8906-46a2-b3f6-0a6405bfc070
+Thái Hiền,person,female,ca sĩ Thái Hiền,6ac6f0e1-395d-465d-929f-fe433cd3dba1
+Duy Cường,person,male,nhạc sĩ Duy Cường,59614515-92da-479e-90ff-c40c103ebaff
+Thái Thảo,person,female,ca sĩ Thái Thảo,c50136b4-3b95-4de2-bb70-4d6072e66f1d
+Trịnh Công Sơn,person,male,nhạc sĩ Trịnh Công Sơn,215a4d96-d23b-431c-a388-b42244a9464f
+Trịnh Vĩnh Trinh,person,female,ca sĩ Trịnh Vĩnh Trinh,4bce19b2-ee48-4a6e-b3d0-6b831450daeb
+Thúy Hằng,person,female,người mẫu Thúy Hằng|siêu mẫu Thúy Hằng,2232ea3d-4eee-4557-9edc-646ac0f15cf6
+Thúy Hạnh,person,female,người mẫu Thúy Hạnh|siêu mẫu Thúy Hạnh,55286583-a7b6-48ec-a548-84a25d11d647
+Lưu Thiên Hương,person,female,nhạc sĩ Lưu Thiên Hương,3349f2a6-3420-4c76-8ca9-6212fcca9db8
+Yến Trang,person,female,ca sĩ Yến Trang,12498ded-995c-44e4-9654-7177fe88fd25
+Yến Nhi,person,female,ca sĩ Yến Nhi|Yến Nhi Mây Trắng,bed96154-0400-482e-a861-81e8888a5630
+Lê Đức Thọ,person,male,Phan Đình Khải|ông Lê Đức Thọ,b46f69ff-8326-459c-93d8-ccafe58b0fd0
+Đinh Đức Thiện,person,male,Thượng tướng Đinh Đức Thiện|Phan Đình Dinh,7f097a7a-78f3-47ef-ac3d-10109cf51065
+Mai Chí Thọ,person,male,Đại tướng Mai Chí Thọ|Phan Đình Đống,0a822937-a095-418f-9533-060440830ce3
+Nguyễn Nhạc,person,male,Thái Đức|vua Thái Đức,4c8d7ef3-dab4-4fad-819a-bbdc35b55e0c
+Nguyễn Huệ,person,male,Quang Trung|vua Quang Trung|Quang Trung Nguyễn Huệ,90df78da-e7b0-453e-b6e8-bfdbb0bf7746
+Nguyễn Lữ,person,male,Đông Định Vương,defb8aac-c68d-4f21-be96-789ce01bd67b
+Trưng Trắc,person,female,Trưng Vương|bà Trưng Trắc,b1325d7c-3005-419f-bc80-cbddf669657c
+Trưng Nhị,person,female,bà Trưng Nhị,8c983cc5-cd51-497d-b983-81e713f312f7
+Hồ Nguyên Trừng,person,male,Lê Trừng,643cd984-8e33-4551-b2c8-62922ba836ff
+Hồ Hán Thương,person,male,vua Hồ Hán Thương,21efbf31-0400-4561-a30f-63bb944a3e4d
+Hoàng Đạo,person,male,Nguyễn Tường Long|nhà văn Hoàng Đạo,4f5efd0b-6902-41eb-be3a-779f8aa5fc6a
+Thạch Lam,person,male,Nguyễn Tường Lân|nhà văn Thạch Lam,3321fa05-7928-4144-8559-6d7a3ebcc38f
