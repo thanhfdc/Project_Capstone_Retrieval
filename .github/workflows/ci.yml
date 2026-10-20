@@ -115,6 +115,22 @@ jobs:
           curl -fs localhost:8080/api/search -H 'content-type: application/json' -d '{"query":"ảnh Mỹ Tâm"}' | grep -q '"status":"ok"'
         env:
           COMPOSE_FILE: compose.yaml
+      - uses: actions/setup-python@v5
+        if: env.PUSH != 'true'
+        with:
+          python-version: "3.12"
+      - name: Load test the running stack (Locust, fixture corpus)
+        if: env.PUSH != 'true'
+        run: |
+          pip install locust==2.32.4
+          python eval/run_load.py --host http://localhost:8080 --users 5 20 --duration 20 --out reports/ci
+          cat reports/ci/load_report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the load report
+        if: env.PUSH != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-report
+          path: reports/ci
 
   deploy:
     # Optional: set DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (and DEPLOY_PATH) in the repo secrets
