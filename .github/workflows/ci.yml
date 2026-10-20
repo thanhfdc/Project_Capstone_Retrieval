@@ -104,7 +104,7 @@ jobs:
           cp backend/tests/fixtures/relations/*.csv data/relations/
           chmod -R a+rwX data models
           export ENCODER_BACKEND=hash
-          docker compose up -d db
+          docker compose up -d --wait db   # wait for the healthcheck, or the pipeline connects too early
           docker run --rm --network image-retrieval_default -e ENCODER_BACKEND=hash \
             -e DATABASE_URL=postgresql://capstone:capstone@db:5432/capstone -v "$PWD/data:/data" \
             ${{ steps.names.outputs.prefix }}-api:latest python -m app.jobs.pipeline
