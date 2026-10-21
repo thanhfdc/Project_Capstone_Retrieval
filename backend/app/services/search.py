@@ -360,7 +360,7 @@ def _short_names(refs: list[EntityRef]) -> str:
     """One name per person for a label: "Phạm Nhật Vượng" stands for "Chân dung studio Phạm Nhật Vượng Forbes"
     and "Mỹ Linh" for "Mỹ Linh (ca sĩ)", the crawled duplicates the name was matched to."""
     kept: list[str] = []
-    for name in sorted({r.name for r in refs}, key=len):
+    for name in sorted({r.name for r in refs}, key=lambda n: (len(n), n)):
         if not any(fold(_NAME_TAIL.split(k, 1)[0]) in fold(name) for k in kept):
             kept.append(name)
     return ", ".join(kept)
