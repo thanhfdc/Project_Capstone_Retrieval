@@ -12,7 +12,7 @@ from ..config import Settings
 from ..textnorm import fold
 from . import relations as rel
 from . import retriever as R
-from .entity_linker import EntityLinker, EntityRef, person_key
+from .entity_linker import _NAME_TAIL, EntityLinker, EntityRef, person_key
 from .query_parser import Intent, QueryPlan, RuleParser
 
 
@@ -259,7 +259,7 @@ class SearchService:
         return list(reversed(chain))
 
     def _chain_label(self, it: Intent, names: dict) -> str:
-        seed = ", ".join(s.name for s in it.seeds)
+        seed = _short_names(it.seeds)
         for step in it.relation_steps[:-1]:
             seed = f"{step.label} {seed}"
         return seed
@@ -354,3 +354,13 @@ class SearchService:
                 while len(self._cache) > self.s.result_cache_size:
                     self._cache.popitem(last=False)
         return out
+
+
+def _short_names(refs: list[EntityRef]) -> str:
+    """One name per person for a label: "Phạm Nhật Vượng" stands for "Chân dung studio Phạm Nhật Vượng Forbes"
+    and "Mỹ Linh" for "Mỹ Linh (ca sĩ)", the crawled duplicates the name was matched to."""
+    kept: list[str] = []
+    for name in sorted({r.name for r in refs}, key=len):
+        if not any(fold(_NAME_TAIL.split(k, 1)[0]) in fold(name) for k in kept):
+            kept.append(name)
+    return ", ".join(kept)

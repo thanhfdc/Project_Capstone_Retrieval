@@ -386,6 +386,13 @@ def test_name_without_its_surname_asks_for_the_person():
     assert parser.parse("Jack Ma").intents[0].unknown_name == "jack ma"
 
 
+def test_label_names_each_person_once():
+    from app.services.search import _short_names
+    refs = [EntityRef(f"e{i}", n, "person", None) for i, n in enumerate(
+        ["Chân dung studio Phạm Nhật Vượng Forbes", "Phạm Nhật Vượng", "Mỹ Linh (ca sĩ)", "Mỹ Linh", "Đen Vâu"])]
+    assert _short_names(refs) == "Mỹ Linh, Đen Vâu, Phạm Nhật Vượng"
+
+
 def test_tone_mark_placement_styles_are_one_spelling():
     from app.textnorm import tone_style
     assert tone_style("hoà bình thuỷ khoẻ uỷ") == "hòa bình thủy khỏe ủy"
