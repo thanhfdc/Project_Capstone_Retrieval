@@ -2,7 +2,7 @@
 
 ## 1. Con số trong file này là gì
 
-Số ở mục 2 đo trên máy chạy demo ngày 20/10/2026 với **dữ liệu thật** (90.327 ảnh đang phục vụ) và **SigLIP 2 thật** (`siglip-onnx:siglip2`, ONNX trên CPU), bằng `eval/run_eval.py`. Mục 3 là throughput từ load test Locust (`eval/run_load.py`). Đầu mỗi báo cáo tự ghi số ảnh, encoder và cấu hình máy.
+Số ở mục 2 đo trên máy chạy demo ngày 21/10/2026 (mục 3 ngày 20/10) với **dữ liệu thật** (90.327 ảnh đang phục vụ) và **SigLIP 2 thật** (`siglip-onnx:siglip2`, ONNX trên CPU), bằng `eval/run_eval.py`. Mục 3 là throughput từ load test Locust (`eval/run_load.py`). Đầu mỗi báo cáo tự ghi số ảnh, encoder và cấu hình máy.
 
 ## 2. Latency từng câu (dữ liệu thật, SigLIP thật)
 
@@ -10,12 +10,12 @@ Số ở mục 2 đo trên máy chạy demo ngày 20/10/2026 với **dữ liệu
 
 | Loại | Số câu | p50 | p95 | p99 | max | ≥ 3 s |
 |---|---:|---:|---:|---:|---:|---:|
-| Single intent | 1.507 | 3,0 ms | 40,5 ms | 55,0 ms | 95,3 ms | 0 |
-| Multi-intent | 842 | 2,9 ms | 5,6 ms | 46,2 ms | 123,9 ms | 0 |
-| Multi-hop | 605 | 2,8 ms | 4,0 ms | 5,4 ms | 52,5 ms | 0 |
-| Robustness | 222 | 10,9 ms | 60,7 ms | 84,0 ms | 168,2 ms | 0 |
+| Single intent | 1.507 | 4,2 ms | 59,1 ms | 195,6 ms | 496,1 ms | 0 |
+| Multi-intent | 842 | 3,4 ms | 6,1 ms | 100,2 ms | 163,1 ms | 0 |
+| Multi-hop | 605 | 3,2 ms | 4,8 ms | 6,1 ms | 20,9 ms | 0 |
+| Robustness | 222 | 11,4 ms | 63,3 ms | 103,2 ms | 157,7 ms | 0 |
 
-Câu theo tên người và quan hệ chạy bằng SQL trên chỉ mục nên chỉ vài ms. Câu mô tả tự do toàn kho (encode SigLIP + HNSW + full-text + RRF) là nhóm chậm nhất, vẫn dưới 0,5 giây (lần chạy lúc 07:47 cùng ngày có câu chậm nhất 438 ms). 0 lần gọi LLM. Nguồn: `reports/eval_report.md` (20/10/2026 08:57, 3.176 câu).
+Câu theo tên người và quan hệ chạy bằng SQL trên chỉ mục nên chỉ vài ms. Câu mô tả tự do toàn kho (encode SigLIP + HNSW + full-text + RRF) là nhóm chậm nhất, vẫn dưới 0,5 giây. 0 lần gọi LLM. Nguồn: `reports/eval_report.md` (21/10/2026 07:39, 3.176 câu).
 
 ## 3. Throughput (load test)
 

@@ -41,7 +41,7 @@ Tài liệu này là bản thiết kế và hướng dẫn triển khai. Các c�
 <a id="s00"></a>
 ## 0. Trạng thái triển khai thực tế (phiên bản 3)
 
-Mục này đối chiếu bản thiết kế bên dưới với code đã chạy trong repository, cập nhật ngày 20/10/2026. Các mục 1–22 giữ nguyên lập luận thiết kế; chỗ nào code làm khác thì có khung **"Đã triển khai (v3)"** ngay dưới tiêu đề mục đó. Khi hai nơi khác nhau, **code và mục 0 là bản đúng**.
+Mục này đối chiếu bản thiết kế bên dưới với code đã chạy trong repository, cập nhật ngày 21/10/2026. Các mục 1–22 giữ nguyên lập luận thiết kế; chỗ nào code làm khác thì có khung **"Đã triển khai (v3)"** ngay dưới tiêu đề mục đó. Khi hai nơi khác nhau, **code và mục 0 là bản đúng**.
 
 ### 0.1 Kết quả hiện có
 
@@ -49,22 +49,22 @@ Mục này đối chiếu bản thiết kế bên dưới với code đã chạy
 |---|---|---|
 | Ảnh đang phục vụ | 90.327 ảnh phân biệt (theo SHA-256), có thumbnail và vector SigLIP 2 | `GET /api/corpus/stats`, `data/reports/corpus_funnel.json` |
 | Bộ test tự động | 3.176 câu sinh từ nhãn approved và bảng quan hệ (single 1.507, multi-intent 842, multi-hop 605, câu dễ sai 222), gồm ca dương tính, âm tính và ca dễ sai | `eval/make_testcases.py --per-type 1500`, `eval/testcases.jsonl` |
-| Latency (lần chạy 20/10 08:57, 3.176 câu, SigLIP thật, cache tắt, từng câu một) | 0 câu ≥ 3 s; max 168 ms; p99 single 55 ms, multi-intent 46 ms, multi-hop 5,4 ms, câu dễ sai 84 ms | `reports/eval_report.md` |
+| Latency (lần chạy 21/10 07:39, 3.176 câu, SigLIP thật, cache tắt, từng câu một) | 0 câu ≥ 3 s; max 496 ms; p99 single 196 ms, multi-intent 100 ms, multi-hop 6 ms, câu dễ sai 103 ms | `reports/eval_report.md` |
 | Throughput (Locust qua Nginx, 20/10 07:52) | 20 người dùng: 18,8 RPS, p99 120 ms, 0 lỗi trên 1.122 request; RPS tăng tuyến tính 1,0 → 4,8 → 9,4 → 18,8, chưa bão hòa | `reports/load_report.md` |
 | Scale (20/10 08:46, 32 người không nghỉ, Locust trong mạng Docker) | 1 worker: 292 RPS bão hòa, p99 460 ms, 0 lỗi trên 17.382 request; 4 worker chỉ +24% RPS nhưng RAM 1,9 → 6,4 GB, p99 910 ms nên giữ 1 worker | `reports/scale_report_docker.md`, `docs/PERFORMANCE.md` mục 3b |
 | Gọi LLM | 0 lần trên toàn bộ test: mọi câu đi qua bộ luật | cột `LLM calls` trong báo cáo |
 | Unit + integration test | 61 test, chạy trong CI với Postgres pgvector thật | `backend/tests`, `.github/workflows/ci.yml` |
 
-Chất lượng lần chạy 20/10 08:57 (`reports/eval_report.md`) trên máy demo, 3.176 câu (precision@10 = tỷ lệ ảnh trong top 10 có nhãn đúng người; status = trả đúng trạng thái mong đợi):
+Chất lượng lần chạy 21/10 07:39 (`reports/eval_report.md`, sau các bản sửa dấu tên và tên thiếu họ) trên máy demo, 3.176 câu (precision@10 = tỷ lệ ảnh trong top 10 có nhãn đúng người; status = trả đúng trạng thái mong đợi):
 
 | Loại | Số câu | Status đúng | Nhận đúng loại câu | Precision@10 |
 |---|---:|---:|---:|---:|
-| Single | 1.507 | 99% | 100% | 95% |
-| Multi-intent | 842 | 99% | 98% | 96% |
+| Single | 1.507 | 99% | 100% | 96% |
+| Multi-intent | 842 | 99% | 98% | 97% |
 | Multi-hop | 605 | 98% | 98% | 97% |
 | Câu dễ sai (không được trả ảnh sai) | 222 | 96% | | |
 
-So với lần chạy 19/10 trước khi sửa: gõ sai tên 44% → 84%, "chụp cùng" 61% → 82%, câu dễ sai 58% → 96%, nhận đúng câu multi-intent 86% → 98%. Chi tiết từng biến thể ở bảng "By variant" của báo cáo.
+So với lần chạy 19/10 trước khi sửa: gõ sai tên 44% → 88%, "chụp cùng" 61% → 86%, câu dễ sai 58% → 96%, nhận đúng câu multi-intent 86% → 98%. Chi tiết từng biến thể ở bảng "By variant" của báo cáo.
 
 ### 0.2 Đối chiếu từng phần
 
