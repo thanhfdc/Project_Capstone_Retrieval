@@ -10,12 +10,12 @@ Số ở mục 2 đo trên máy chạy demo ngày 20/10/2026 với **dữ liệu
 
 | Loại | Số câu | p50 | p95 | p99 | max | ≥ 3 s |
 |---|---:|---:|---:|---:|---:|---:|
-| Single intent | 1.507 | 3,4 ms | 53,8 ms | 176,4 ms | 438,0 ms | 0 |
-| Multi-intent | 842 | 3,0 ms | 4,4 ms | 90,5 ms | 165,4 ms | 0 |
-| Multi-hop | 605 | 2,8 ms | 4,4 ms | 5,3 ms | 80,5 ms | 0 |
-| Robustness | 222 | 11,0 ms | 61,4 ms | 94,6 ms | 134,1 ms | 0 |
+| Single intent | 1.507 | 3,0 ms | 40,5 ms | 55,0 ms | 95,3 ms | 0 |
+| Multi-intent | 842 | 2,9 ms | 5,6 ms | 46,2 ms | 123,9 ms | 0 |
+| Multi-hop | 605 | 2,8 ms | 4,0 ms | 5,4 ms | 52,5 ms | 0 |
+| Robustness | 222 | 10,9 ms | 60,7 ms | 84,0 ms | 168,2 ms | 0 |
 
-Câu theo tên người và quan hệ chạy bằng SQL trên chỉ mục nên chỉ vài ms. Câu mô tả tự do toàn kho (encode SigLIP + HNSW + full-text + RRF) là nhóm chậm nhất, vẫn dưới 0,5 giây. 0 lần gọi LLM. Nguồn: `reports/eval_report.md` (20/10/2026 07:47, 3.176 câu).
+Câu theo tên người và quan hệ chạy bằng SQL trên chỉ mục nên chỉ vài ms. Câu mô tả tự do toàn kho (encode SigLIP + HNSW + full-text + RRF) là nhóm chậm nhất, vẫn dưới 0,5 giây (lần chạy lúc 07:47 cùng ngày có câu chậm nhất 438 ms). 0 lần gọi LLM. Nguồn: `reports/eval_report.md` (20/10/2026 08:57, 3.176 câu).
 
 ## 3. Throughput (load test)
 

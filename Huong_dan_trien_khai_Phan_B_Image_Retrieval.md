@@ -48,14 +48,14 @@ Mục này đối chiếu bản thiết kế bên dưới với code đã chạy
 | Chỉ tiêu | Kết quả | Nguồn |
 |---|---|---|
 | Ảnh đang phục vụ | 90.327 ảnh phân biệt (theo SHA-256), có thumbnail và vector SigLIP 2 | `GET /api/corpus/stats`, `data/reports/corpus_funnel.json` |
-| Bộ test tự động | 3.162 câu sinh từ nhãn approved và bảng quan hệ (single 1.507, multi-intent 842, multi-hop 605, câu dễ sai 208), gồm ca dương tính, âm tính và ca dễ sai; bảng chất lượng dưới đây là lần chạy 20/10 với bộ cũ 2.998 câu | `eval/make_testcases.py --per-type 1500` |
-| Latency (lần chạy 20/10 07:47, 3.176 câu, SigLIP thật, cache tắt, từng câu một) | 0 câu ≥ 3 s; max 438 ms; p99 single 176 ms, multi-intent 91 ms, multi-hop 5 ms | `reports/eval_report.md` |
+| Bộ test tự động | 3.176 câu sinh từ nhãn approved và bảng quan hệ (single 1.507, multi-intent 842, multi-hop 605, câu dễ sai 222), gồm ca dương tính, âm tính và ca dễ sai | `eval/make_testcases.py --per-type 1500`, `eval/testcases.jsonl` |
+| Latency (lần chạy 20/10 08:57, 3.176 câu, SigLIP thật, cache tắt, từng câu một) | 0 câu ≥ 3 s; max 168 ms; p99 single 55 ms, multi-intent 46 ms, multi-hop 5,4 ms, câu dễ sai 84 ms | `reports/eval_report.md` |
 | Throughput (Locust qua Nginx, 20/10 07:52) | 20 người dùng: 18,8 RPS, p99 120 ms, 0 lỗi trên 1.122 request; RPS tăng tuyến tính 1,0 → 4,8 → 9,4 → 18,8, chưa bão hòa | `reports/load_report.md` |
 | Scale (20/10 08:46, 32 người không nghỉ, Locust trong mạng Docker) | 1 worker: 292 RPS bão hòa, p99 460 ms, 0 lỗi trên 17.382 request; 4 worker chỉ +24% RPS nhưng RAM 1,9 → 6,4 GB, p99 910 ms nên giữ 1 worker | `reports/scale_report_docker.md`, `docs/PERFORMANCE.md` mục 3b |
 | Gọi LLM | 0 lần trên toàn bộ test: mọi câu đi qua bộ luật | cột `LLM calls` trong báo cáo |
 | Unit + integration test | 61 test, chạy trong CI với Postgres pgvector thật | `backend/tests`, `.github/workflows/ci.yml` |
 
-Chất lượng lần chạy 20/10 07:47 trên máy demo, 3.176 câu (precision@10 = tỷ lệ ảnh trong top 10 có nhãn đúng người; status = trả đúng trạng thái mong đợi):
+Chất lượng lần chạy 20/10 08:57 (`reports/eval_report.md`) trên máy demo, 3.176 câu (precision@10 = tỷ lệ ảnh trong top 10 có nhãn đúng người; status = trả đúng trạng thái mong đợi):
 
 | Loại | Số câu | Status đúng | Nhận đúng loại câu | Precision@10 |
 |---|---:|---:|---:|---:|
