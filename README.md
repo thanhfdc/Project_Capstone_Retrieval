@@ -59,6 +59,25 @@ python eval/run_scale.py --workers 1 2 4 --users 32 --duration 60   # throughput
 
 Kết quả ở `reports/eval_report.md`, `reports/load_report.md` và `reports/scale_report.md`. Số process API đặt bằng `API_WORKERS` trong `.env` (mặc định 1); xem `docs/PERFORMANCE.md` mục 3b.
 
+## API (chạy test case từ ngoài)
+
+Web demo và mọi script đo đều gọi cùng một API qua Nginx, không cần key. Thay `http://localhost:8080` bằng link demo để chạy từ máy khác.
+
+| Endpoint | Dùng để |
+|---|---|
+| `POST /api/search` | Tìm ảnh. Body `{"query": "...", "top_k": 10, "selected_entity_ids": []}`; `query` 1–500 ký tự, `top_k` 1–50. Thêm `?nocache=true` để đo latency thật |
+| `GET /api/corpus/stats` | Số ảnh đang phục vụ, encoder, số worker |
+| `GET /health/ready` | API đã sẵn sàng chưa |
+
+```bash
+curl -X POST "http://localhost:8080/api/search?nocache=true" -H "Content-Type: application/json" \
+  -d '{"query": "ảnh con trai chủ tịch Phạm Nhật Vượng", "top_k": 10}'
+```
+
+Kết quả có `status` (`ok`, `no_results`, `no_seed_entity`, `no_verified_relation`, `needs_clarification`), `query_type` (`single`, `multi_intent`, `multi_hop`), `groups` (ảnh theo từng ý của câu), `items` (người, mô tả, link ảnh), `relation_paths` (chuỗi quan hệ của câu multi-hop), `clarification_options` (lựa chọn khi tên khớp nhiều người; gửi lại với `selected_entity_ids`) và `metrics` (thời gian từng bước, ms).
+
+Chạy cả bộ test case và sinh báo cáo: `python eval/run_eval.py --api <url> --cases eval/testcases.jsonl --out reports`. Mỗi dòng của file là một JSON như `{"id": "t1", "query": "vợ của Trấn Thành", "query_type": "multi_hop", "expected_status": "ok"}`; cách sinh và chấm ở `docs/TESTING.md`.
+
 ## Quan hệ cho multi-hop
 
 Hệ thống không đoán quan hệ giữa người với người: nó chỉ trả lời những gì có trong hai file:
