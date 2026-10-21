@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     linker = EntityLinker(pool)
     aliases = linker.reload()
     llm = None
-    if settings.anthropic_api_key:
+    if settings.anthropic_api_key and settings.llm_model:
         from .services.llm import LlmPlanner
         llm = LlmPlanner(settings.anthropic_api_key, settings.llm_model, settings.llm_timeout_s)
     service = SearchService(settings, pool, encoder, linker, llm)

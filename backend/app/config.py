@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # Optional LLM fallback for queries the rule parser cannot plan. Off when no key is set.
     anthropic_api_key: str = ""
-    llm_model: str = "claude-opus-5-5"
+    llm_model: str = ""
     llm_timeout_s: float = 1.2
 
     download_concurrency: int = 32
