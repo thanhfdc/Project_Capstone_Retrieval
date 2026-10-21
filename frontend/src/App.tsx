@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { search, stats, type Item, type SearchResponse, type Stats } from "./api";
 import { Icon } from "./icons";
 
-const REPO_URL = "https://github.com/thanhfdc/project_capstone_retrieval";
+const REPO_URL = "https://github.com/VSF-AR-ES-V-Lookup/DiemCongThanh_Project_Retrieval_Image";
 
 const EXAMPLES: { type: string; kind: QueryKind; hint: string; queries: string[] }[] = [
   {
@@ -154,7 +154,9 @@ export default function App() {
             <Icon name="image" />
           </span>
           <span className="brand-text">
-            <strong>Tìm ảnh</strong>
+            <strong>
+              Tìm ảnh người nổi tiếng <span className="nowrap">Việt Nam</span>
+            </strong>
             <small>Capstone · Phần B</small>
           </span>
         </button>
@@ -182,10 +184,10 @@ export default function App() {
         {idle && (
           <div className="hero">
             <h1>
-              Tìm ảnh bằng <span className="grad">câu hỏi tiếng Việt</span>
+              Tìm ảnh <span className="grad">người nổi tiếng Việt Nam</span>
             </h1>
             <p>
-              Gõ tên người, mô tả cảnh hoặc quan hệ như "vợ của…", "con trai của…". Hệ thống hiểu câu hỏi rồi tìm
+              Gõ tên ca sĩ, diễn viên, vận động viên, chính trị gia…, mô tả cảnh hoặc quan hệ như "vợ của…", "con trai của…". Hệ thống hiểu câu hỏi rồi tìm
               trong {corpus ? corpus.serving_images.toLocaleString("vi-VN") : "hơn 80.000"} ảnh, dưới 3 giây.
             </p>
           </div>

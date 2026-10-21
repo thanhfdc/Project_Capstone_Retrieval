@@ -88,6 +88,7 @@ a { color: var(--accent); }
 .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-text strong { font-size: 1.05rem; letter-spacing: -0.01em; }
 .brand-text small { color: var(--muted); font-size: 0.75rem; }
+.nowrap { white-space: nowrap; }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
 .pill {
   display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
@@ -325,6 +326,7 @@ a { color: var(--accent); }
 @media (max-width: 560px) {
   .page-idle { padding-top: 4vh; }
   .brand-text small, .pill { display: none; }
+  .brand-text strong { font-size: 0.95rem; }
   .searchbar { padding-left: 40px; }
   .search-icon { left: 13px; }
   .go span:last-child { display: none; }
