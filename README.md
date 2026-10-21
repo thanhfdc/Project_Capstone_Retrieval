@@ -8,6 +8,8 @@ Tìm ảnh trong kho khoảng 80K ảnh bằng ngôn ngữ tự nhiên, hỗ tr�
 | Multi-intent | "hồ bơi và công viên nước ở Phú Quốc", "Sơn Tùng chụp cùng Hà Anh Tuấn" |
 | Multi-hop | "ảnh con trai chủ tịch Phạm Nhật Vượng", "con trai của người sáng lập Vingroup" |
 
+**Demo:** https://congthanh.tailc0ad82.ts.net (chạy trên máy demo qua Tailscale Funnel, mở được khi máy đang bật).
+
 Stack: FastAPI, PostgreSQL 16 + pgvector (HNSW) + full-text, SigLIP 2 (text tower chạy ONNX), React + Nginx, Docker Compose, GitHub Actions.
 
 Tài liệu: [hướng dẫn triển khai, mục 0 là trạng thái thực tế](Huong_dan_trien_khai_Phan_B_Image_Retrieval.md) · [kiến trúc và sơ đồ](docs/ARCHITECTURE.md) · [cách làm test case](docs/TESTING.md) · [hiệu năng](docs/PERFORMANCE.md)
@@ -117,6 +119,19 @@ Trên server có domain, chạy kèm Caddy để có HTTPS tự động:
 DOMAIN=timanh.example.com IMAGE_PREFIX=ghcr.io/<user>/<repo> \
   docker compose -f compose.yaml -f compose.prod.yaml up -d
 ```
+
+### Mở web demo ra internet không cần server (Tailscale Funnel)
+
+Máy demo đang chạy stack (`docker compose up -d`) có thể cho người khác truy cập bằng một link HTTPS cố định, miễn phí, không cần mở port hay mua domain:
+
+```powershell
+winget install --id Tailscale.Tailscale   # rồi đăng nhập
+& "C:\Program Files\Tailscale\tailscale.exe" funnel --bg 8080
+# lần đầu mở link nó in ra để bật HTTPS và Funnel, rồi chạy lại lệnh trên
+# tắt: tailscale funnel --https=443 off
+```
+
+Lệnh in ra link `https://<tên-máy>.<tailnet>.ts.net`, giữ nguyên qua các lần khởi động lại. Link chỉ mở được khi máy demo bật và Docker đang chạy; muốn chạy 24/7 thì dùng server và `compose.prod.yaml` ở trên.
 
 ## Cấu trúc thư mục
 

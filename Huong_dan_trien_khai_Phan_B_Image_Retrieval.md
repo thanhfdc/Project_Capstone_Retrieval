@@ -86,6 +86,7 @@ So với lần chạy 19/10 trước khi sửa: gõ sai tên 44% → 84%, "chụ
 | Docker, CI (16) | Compose có Qdrant, migration chạy tay | Compose `db` (pgvector 0.8.0-pg16), `api`, `web`, `worker` (profile `jobs`); migration tự chạy khi API và job khởi động; GitHub Actions: ruff → pytest → build → dựng stack thử → đẩy image lên GHCR → deploy SSH tùy chọn; `compose.prod.yaml` thêm Caddy HTTPS | |
 | Đánh giá (17) | 300 câu viết tay + qrels chấm tay, nDCG, baseline B0–P2 | Khoảng 3.000 câu **sinh tự động** từ nhãn approved và quan hệ đã kiểm chứng, chấm tự động theo entity; câu mô tả cảnh để riêng trong `eval/manual_cases.jsonl` để chấm bằng mắt | 300 câu chấm tay không kịp hạn và quá ít so với 90K ảnh; đáp án theo entity chấm lại được mỗi lần sửa code. Đổi lại chưa có nDCG và chưa chạy ablation B0–P2 (xem 0.5) |
 | Load test (18) | Locust | `eval/run_load.py` (bọc Locust), tự sinh `reports/load_report.md` | |
+| Web demo có tên miền (điểm cộng SWE) | Server có domain, Caddy HTTPS | Link cố định https://congthanh.tailc0ad82.ts.net qua **Tailscale Funnel** từ máy demo; job deploy SSH và `compose.prod.yaml` (Caddy) vẫn sẵn sàng nếu có server | Host miễn phí (Render, Railway, Fly) chỉ có 0,5–1 GB RAM, không đủ cho api (khoảng 1,9 GB) và Postgres; Funnel miễn phí, HTTPS, link không đổi, nhưng chỉ mở được khi máy demo bật |
 
 ### 0.3 Phần bổ sung ngoài hướng dẫn và lý do
 
